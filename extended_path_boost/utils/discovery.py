@@ -1,6 +1,6 @@
 """
-The :mod:`skltemplate.utils.discovery` module includes utilities to discover
-objects (i.e. estimators, displays, functions) from the `skltemplate` package.
+The :mod:`extended_path_boost.utils.discovery` module includes utilities to discover
+objects (i.e. estimators, displays, functions) from the `extended_path_boost` package.
 """
 
 # Adapted from scikit-learn
@@ -26,7 +26,7 @@ _MODULE_TO_IGNORE = {"tests"}
 
 
 def all_estimators(type_filter=None):
-    """Get a list of all estimators from `skltemplate`.
+    """Get a list of all estimators from `extended_path_boost`.
 
     This function crawls the module and gets all classes that inherit
     from `BaseEstimator`. Classes that are defined in test-modules are not
@@ -50,7 +50,7 @@ def all_estimators(type_filter=None):
 
     Examples
     --------
-    >>> from skltemplate.utils.discovery import all_estimators
+    >>> from extended_path_boost.utils.discovery import all_estimators
     >>> estimators = all_estimators()
     >>> type(estimators)
     <class 'list'>
@@ -64,12 +64,12 @@ def all_estimators(type_filter=None):
         return True
 
     all_classes = []
-    root = str(Path(__file__).parent.parent)  # skltemplate package
+    root = str(Path(__file__).parent.parent)  # extended_path_boost package
     # Ignore deprecation warnings triggered at import time and from walking
     # packages
     with ignore_warnings(category=FutureWarning):
         for _, module_name, _ in pkgutil.walk_packages(
-            path=[root], prefix="skltemplate."
+            path=[root], prefix="extended_path_boost."
         ):
             module_parts = module_name.split(".")
             if any(part in _MODULE_TO_IGNORE for part in module_parts):
@@ -126,7 +126,7 @@ def all_estimators(type_filter=None):
 
 
 def all_displays():
-    """Get a list of all displays from `skltemplate`.
+    """Get a list of all displays from `extended_path_boost`.
 
     Returns
     -------
@@ -136,16 +136,16 @@ def all_displays():
 
     Examples
     --------
-    >>> from skltemplate.utils.discovery import all_displays
+    >>> from extended_path_boost.utils.discovery import all_displays
     >>> displays = all_displays()
     """
     all_classes = []
-    root = str(Path(__file__).parent.parent)  # skltemplate package
+    root = str(Path(__file__).parent.parent)  # extended_path_boost package
     # Ignore deprecation warnings triggered at import time and from walking
     # packages
     with ignore_warnings(category=FutureWarning):
         for _, module_name, _ in pkgutil.walk_packages(
-            path=[root], prefix="skltemplate."
+            path=[root], prefix="extended_path_boost."
         ):
             module_parts = module_name.split(".")
             if any(part in _MODULE_TO_IGNORE for part in module_parts):
@@ -170,14 +170,14 @@ def _is_checked_function(item):
         return False
 
     mod = item.__module__
-    if not mod.startswith("skltemplate.") or mod.endswith("estimator_checks"):
+    if not mod.startswith("extended_path_boost.") or mod.endswith("estimator_checks"):
         return False
 
     return True
 
 
 def all_functions():
-    """Get a list of all functions from `skltemplate`.
+    """Get a list of all functions from `extended_path_boost`.
 
     Returns
     -------
@@ -187,16 +187,16 @@ def all_functions():
 
     Examples
     --------
-    >>> from skltemplate.utils.discovery import all_functions
+    >>> from extended_path_boost.utils.discovery import all_functions
     >>> functions = all_functions()
     """
     all_functions = []
-    root = str(Path(__file__).parent.parent)  # skltemplate package
+    root = str(Path(__file__).parent.parent)  # extended_path_boost package
     # Ignore deprecation warnings triggered at import time and from walking
     # packages
     with ignore_warnings(category=FutureWarning):
         for _, module_name, _ in pkgutil.walk_packages(
-            path=[root], prefix="skltemplate."
+            path=[root], prefix="extended_path_boost."
         ):
             module_parts = module_name.split(".")
             if any(part in _MODULE_TO_IGNORE for part in module_parts):

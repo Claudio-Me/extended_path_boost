@@ -5,7 +5,7 @@
 
 from sklearn.utils.estimator_checks import parametrize_with_checks
 
-from skltemplate.utils.discovery import all_estimators
+from extended_path_boost.utils.discovery import all_estimators
 
 
 # parametrize_with_checks allows to get a generator of check that is more fine-grained
