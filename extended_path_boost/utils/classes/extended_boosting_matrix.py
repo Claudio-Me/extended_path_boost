@@ -1,14 +1,17 @@
 import numpy as np
 import pandas as pd
+from matplotlib.font_manager import list_fonts
 
 from pandas.core.interchange import dataframe
+from typing import Iterable
 
 import networkx as nx
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import ast
-
+import numbers
 import copy
+import ast
 
 
 class ExtendedBoostingMatrix:
@@ -19,51 +22,44 @@ class ExtendedBoostingMatrix:
             ExtendedBoostingMatrix.sort_df_columns(self.df)
 
     @staticmethod
-    def find_paths_in_dataset(dataset: list[nx.classes.multigraph.MultiGraph], labelled_path: list,
-                              label_name: str) -> list:
-        """
-                Finds paths in a dataset of MultiGraph objects based on specified node labels.
+    def find_paths_in_dataset(dataset: list[nx.Graph], path_labels: list,
+                              id_label_name: str, frequency_list=None) -> list:
 
-                This method identifies paths in each graph within the dataset where the nodes
-                follow a sequential pattern of labels defined in 'path_label'. For each graph,
-                it starts by identifying nodes with the label defined as the first entry in
-                'path_label' and then uses those starting nodes to locate complete paths
-                conforming to the label sequence.
-
-                Args:
-                    dataset (list[nx.classes.multigraph.MultiGraph]): A list of MultiGraph
-                    objects to search for the paths.
-                    labelled_path (list): A sequence of node labels which specifies the
-                    pattern for the path.
-                    label_name (str): The name of the node attribute that contains
-                    the label values.
-
-                Returns:
-                    list: A nested list where each top-level entry corresponds to a graph
-                    in the dataset, and contains a sublist of paths. Each path is represented
-                    as a list of nodes in the order they appear in the labelled_path.
-        """
-
-        # find starting nodes
-        starting_nodes = [[] for _ in range(len(dataset))]
-        for i, graph in enumerate(dataset):
-            for node, attributes in graph.nodes(data=True):
-                if attributes.get(label_name) == labelled_path[0]:
-                    starting_nodes[i].append(node)
+        if frequency_list is None:
+            frequency_list = [1] * len(dataset)
+        assert len(frequency_list) == len(dataset)
         paths_in_graphs = [[] for _ in range(len(dataset))]
         for i, graph in enumerate(dataset):
-            for starting_node in starting_nodes[i]:
+            if frequency_list[i] > 0:
                 paths_in_graphs[i].extend(
-                    ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph=graph, path_labels=labelled_path,
-                                                                          label_name=label_name,
-                                                                          starting_node=starting_node))
-
+                    ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph=graph, path_labels=path_labels,
+                                                                          id_label_name=id_label_name))
 
         return paths_in_graphs
 
     @staticmethod
-    def find_labelled_path_in_nx_graph(graph: nx.Graph, path_labels: list, label_name: str, starting_node: int,
-                                       path=None, visited_nodes: set | None = None) -> list[tuple[int]]:
+    def find_labelled_path_in_nx_graph(graph: nx.Graph, path_labels: list, id_label_name: str) -> list[tuple[int]]:
+        # find starting nodes
+        starting_nodes = []
+        for node, attributes in graph.nodes(data=True):
+            if attributes.get(id_label_name) == path_labels[0]:
+                starting_nodes.append(node)
+
+        found_paths = []
+        for starting_node in starting_nodes:
+            found_paths.extend(
+                ExtendedBoostingMatrix._find_labelled_path_in_nx_graph_from_starting_node(graph=graph,
+                                                                                          path_labels=path_labels,
+                                                                                          id_label_name=id_label_name,
+                                                                                          starting_node=starting_node))
+
+        return found_paths
+
+    @staticmethod
+    def _find_labelled_path_in_nx_graph_from_starting_node(graph: nx.Graph, path_labels: list, id_label_name: str,
+                                                           starting_node: int,
+                                                           path=None, visited_nodes: set | None = None) -> list[
+        tuple[int]]:
         paths_found: list = []
         if path is None:
             path = []
@@ -71,7 +67,7 @@ class ExtendedBoostingMatrix:
             visited_nodes = set()
 
         if starting_node not in visited_nodes:
-            label_of_node = graph.nodes[starting_node].get(label_name)
+            label_of_node = graph.nodes[starting_node].get(id_label_name)
             if label_of_node == path_labels[0]:
                 path = path + [starting_node]
             else:
@@ -85,19 +81,199 @@ class ExtendedBoostingMatrix:
         # the next label we are looking for is always in the second position of the array "path_labels" since the first element is the element we just found
         neighbors_with_right_label = [
             neighbor for neighbor in graph.neighbors(starting_node)
-            if graph.nodes[neighbor].get(label_name) == path_labels[1]
+            if graph.nodes[neighbor].get(id_label_name) == path_labels[1]
         ]
         for neighbour in neighbors_with_right_label:
             if neighbour not in visited_nodes:
-                new_paths = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph=graph,
-                                                                                  path_labels=path_labels[1:],
-                                                                                  label_name=label_name,
-                                                                                  starting_node=neighbour,
-                                                                                  path=path,
-                                                                                  visited_nodes=visited_nodes.copy())
+                new_paths = ExtendedBoostingMatrix._find_labelled_path_in_nx_graph_from_starting_node(graph=graph,
+                                                                                                      path_labels=path_labels[
+                                                                                                                  1:],
+                                                                                                      id_label_name=id_label_name,
+                                                                                                      starting_node=neighbour,
+                                                                                                      path=path,
+                                                                                                      visited_nodes=visited_nodes.copy())
 
                 paths_found.extend(new_paths)
         return paths_found
+
+    @staticmethod
+    def get_attributes_of_node(graph: nx.Graph, node_id: int) -> dict | None:
+        if graph.nodes.get(node_id) is not None:
+            nodes_attributes = graph.nodes.get(node_id)
+            numeric_nodes_attributes = {k: v for k, v in nodes_attributes.items() if isinstance(v, numbers.Number)}
+            return numeric_nodes_attributes
+        else:
+            return None
+
+    @staticmethod
+    def get_edge_attributes_of_nx_graph(graph: nx.Graph, last_edge: tuple) -> dict | None:
+        if isinstance(graph, nx.MultiGraph) and len(last_edge) == 2:
+            last_edge = (last_edge[0], last_edge[1], 0)
+        if graph.edges.get(last_edge) is not None:
+            edge_attributes = graph.edges.get(last_edge)
+            numeric_edge_attributes = {k: v for k, v in edge_attributes.items() if isinstance(v, numbers.Number)}
+            return numeric_edge_attributes
+        else:
+            return None
+
+    @staticmethod
+    def get_attributes_of_last_part_of_the_path(graph: nx.Graph, path: list | tuple) -> dict:
+        """
+            Retrieves and combines attributes of the LAST node in a given path, and optionally,
+            attributes of the edge connecting the last two nodes in the path. The method processes
+            both node and edge attributes in a NetworkX graph and merges them into a single
+            dictionary.
+
+            Parameters
+                graph: nx.Graph
+                    The NetworkX graph from which attributes are retrieved.
+                path: list[int] | tuple[int]
+                    A sequence of node identifiers representing a path in the graph.
+
+            Returns
+                dict
+                    A dictionary containing the combined attributes of the last node and, if
+                    applicable, the edge connecting the last two nodes in the specified path.
+        """
+        path_attributes = {}
+
+        node_attributes = ExtendedBoostingMatrix.get_attributes_of_node(graph, path[-1])
+        if node_attributes is not None:
+            path_attributes.update(node_attributes)
+        if len(path) > 1:
+            edge_attributes = ExtendedBoostingMatrix.get_edge_attributes_of_nx_graph(graph, (path[-2], path[-1]))
+            if edge_attributes is not None:
+                path_attributes.update(edge_attributes)
+        return path_attributes
+
+    @staticmethod
+    def generate_name_of_columns_for(path_label: tuple | list, attributes: Iterable | None) -> list[str] | None:
+
+        if attributes is None:
+            return None
+        else:
+            return [str(path_label) + '_' + str(attribute) for attribute in attributes]
+
+    @staticmethod
+    def combine_attribute_value_of_multiple_paths_in_the_same_graph(values: list[numbers.Number]):
+        return np.mean(values)
+
+    @staticmethod
+    def initialize_boosting_matrix_with_anchor_nodes_attributes(dataset: list[nx.Graph],
+                                                                list_anchor_nodes_labels: list,
+                                                                id_label_name: str, )->pd.DataFrame:
+
+        # this will be a list where the i-th element is a list. This list contains another list, let us call it paths_of_anchor_node.
+        # The j-th element of the list paths_of_anchor_node is a list of tuples. Each tuple is a path in the j-th graph that starts from the i-th anchor node
+        paths_for_each_anchor_node: list[list[list[tuple]]] = []
+        columns_for_dataframe = defaultdict(lambda: [[] for _ in range(len(dataset))])
+        for anchor_node_label in list_anchor_nodes_labels:
+            if isinstance(anchor_node_label, str) or not hasattr(anchor_node_label, '__iter__'):
+                anchor_node_label_as_tuple = tuple([anchor_node_label])
+            else:
+                anchor_node_label_as_tuple = anchor_node_label
+
+            paths_for_anchor_node = ExtendedBoostingMatrix.find_paths_in_dataset(dataset=dataset,
+                                                                                 path_labels=anchor_node_label_as_tuple,
+                                                                                 id_label_name=id_label_name)
+            assert (all(len(path) == 1 for paths_in_graph in paths_for_anchor_node for path in paths_in_graph))
+
+            paths_for_each_anchor_node.append(paths_for_anchor_node)
+            for graph_number, graph in enumerate(dataset):
+
+                cumulative_path_attributes = defaultdict(lambda: [])
+                for path in paths_for_anchor_node[graph_number]:
+                    specific_path_attributes = ExtendedBoostingMatrix.get_attributes_of_last_part_of_the_path(
+                        graph=graph,
+                        path=path)
+                    for key, value in specific_path_attributes.items():
+                        cumulative_path_attributes[key].append(value)
+
+                path_attributes = {
+                    key: ExtendedBoostingMatrix.combine_attribute_value_of_multiple_paths_in_the_same_graph(value) for
+                    key, value in cumulative_path_attributes.items()}
+
+                # note: here we use the fact that from python 3.7 the keys in dictionaries are ordered
+
+                for attribute_name in path_attributes.keys():
+                    column_name = ExtendedBoostingMatrix.generate_name_of_columns_for(
+                        path_label=anchor_node_label_as_tuple, attributes=[attribute_name])
+                    column_name = column_name[0]
+                    columns_for_dataframe[column_name][graph_number] = path_attributes[attribute_name]
+
+                column_name = ExtendedBoostingMatrix.generate_name_of_columns_for(
+                    path_label=anchor_node_label_as_tuple, attributes=["n_times_present"])
+                column_name = column_name[0]
+
+                columns_for_dataframe[column_name][graph_number] = len(paths_for_anchor_node[graph_number])
+
+        extended_boosting_matrix_df = pd.DataFrame(columns_for_dataframe)
+        extended_boosting_matrix_df = extended_boosting_matrix_df.map(lambda x: None if isinstance(x,list) and len(x)==0 else x)
+        return extended_boosting_matrix_df
+
+    @staticmethod
+    def get_attribute_name_from_column_name(column_name: str) -> str:
+        return column_name.split('_', 1)[1]
+
+    @staticmethod
+    def get_path_from_column_name(column_name: str) -> tuple:
+        string_path = column_name.split('_', 1)[0]
+        path = ast.literal_eval(string_path)
+        #this assert can be removed it is used during coding to make sure no error happens here
+        assert isinstance(path, tuple)
+        return path
+
+
+    @staticmethod
+    def get_frequency_boosting_matrix(train_ebm_dataframe: pd.DataFrame)-> pd.DataFrame:
+        selected_columns = [column for column in train_ebm_dataframe.columns if 'n_times_present' in column]
+        return train_ebm_dataframe[selected_columns]
+
+
+    @staticmethod
+    def get_columns_related_to_path(path: tuple, columns_names: list[str]) -> list[str]:
+        def _is_subtuple(main_tuple: tuple, sub_tuple: tuple) -> bool:
+            return sub_tuple == main_tuple[:len(column_path)]
+        columns_to_keep = []
+        for column in columns_names:
+            column_path = ExtendedBoostingMatrix.get_path_from_column_name(column)
+            if _is_subtuple(main_tuple=path, sub_tuple=column_path):
+                columns_to_keep.append(column)
+
+        return columns_to_keep
+
+
+
+
+    # old methods of the class
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
 
     @staticmethod
     def __get_all_possible_node_attributes(dataset: list[nx.classes.multigraph.MultiGraph]) -> set[str]:

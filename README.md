@@ -16,3 +16,6 @@ Refer to the documentation to modify the template for your own scikit-learn
 contribution: https://contrib.scikit-learn.org/extended_path_boost
 
 *Thank you for cleanly contributing to the scikit-learn ecosystem!*
+
+
+
