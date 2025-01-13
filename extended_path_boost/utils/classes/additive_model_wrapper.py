@@ -3,16 +3,17 @@ import pandas as pd
 import warnings
 from sklearn.metrics import mean_squared_error
 import numpy as np
-from extended_boosting_matrix import ExtendedBoostingMatrix
+from .extended_boosting_matrix import ExtendedBoostingMatrix
 
 
 class AdditiveModelWrapper:
     def __init__(self, BaseModelClass, base_model_class_kwargs, learning_rate: float, ):
         # model class will have an interface
         # TODO add the interface
-        self.__last_train_prediction: pd.Series | None = None
 
-        self.train_error = []
+        self._last_train_prediction: pd.Series | None = None
+
+        self.train_mse = []
         self.eval_sets_mse = []
         self.learning_rate = learning_rate
         self.base_learners_list: list = []
@@ -20,27 +21,6 @@ class AdditiveModelWrapper:
         self.BaseModelClass = BaseModelClass
         self.base_model_class_kwargs = base_model_class_kwargs
 
-        # -----------------------------------------------------------------------------------------------------------
-        self.base_learners_with_no_mean = []
-        self.last_train_prediction_with_no_mean: pd.Series | None = None
-        self.__last_test_prediction_with_no_mean: pd.Series | None = None
-        self.train_error_with_no_mean = []
-        self.test_error_with_no_mean = []
-
-        self.base_learners_list_with_no_own_mean = []
-        self.__last_train_prediction_with_no_own_mean: pd.Series | None = None
-        self.__last_test_prediction_with_no_own_mean: pd.Series | None = None
-        self.train_error_with_no_own_mean = []
-        self.test_error_with_no_own_mean = []
-        self.y_mean_with_no_own_mean_list = []
-
-        self.base_learners_list_with_no_bl_mean = []
-        self.__last_train_prediction_with_no_bl_mean: pd.Series | None = None
-        self.__last_test_prediction_with_no_bl_mean: pd.Series | None = None
-        self.train_error_with_no_bl_mean = []
-        self.test_error_with_no_bl_mean = []
-
-        # -----------------------------------------------------------------------------------------------------------
 
     def fit_one_step(self, X, y, best_path, eval_set=None, negative_gradient=None):
         # it fits one step of the boosting
@@ -64,10 +44,10 @@ class AdditiveModelWrapper:
             self.considered_columns.append(columns_to_keep)
             base_learner_prediction = self.learning_rate * pd.Series(
                 new_base_learner.predict(X[columns_to_keep]))
-            self.__last_train_prediction = base_learner_prediction
+            self._last_train_prediction = base_learner_prediction
 
-            train_mse = mean_squared_error(y_true=y, y_pred=self.__last_train_prediction)
-            self.train_error.append(train_mse)
+            train_mse = mean_squared_error(y_true=y, y_pred=self._last_train_prediction)
+            self.train_mse.append(train_mse)
 
 
 
@@ -75,7 +55,7 @@ class AdditiveModelWrapper:
 
             # compute the new target (we have to use zeroed_y - true_neg_gradient instead of just zeroed_y, more explained in paper)
             if negative_gradient is None:
-                negative_gradient = self.__neg_gradient(y=y, y_hat=self.__last_train_prediction)
+                negative_gradient = self._neg_gradient(y=y, y_hat=self._last_train_prediction)
             new_y = pd.Series(negative_gradient)
 
             new_base_learner.fit(restricted_df, new_y)
@@ -84,17 +64,18 @@ class AdditiveModelWrapper:
             self.considered_columns.append(columns_to_keep)
 
             base_learner_prediction = self.learning_rate * new_base_learner.predict(X[columns_to_keep])
-            self.__last_train_prediction += base_learner_prediction
+            self._last_train_prediction += base_learner_prediction
 
-            train_mse = mean_squared_error(y_true=y, y_pred=self.__last_train_prediction)
-            self.train_error.append(train_mse)
+            train_mse = mean_squared_error(y_true=y, y_pred=self._last_train_prediction)
+            self.train_mse.append(train_mse)
 
            
       
 
         if eval_set is not None:
             eval_set_mse = []
-            for i, ebm_df_eval, y_eval in enumerate(eval_set):
+            for i, eval_tuple in enumerate(eval_set):
+                ebm_df_eval, y_eval = eval_tuple
                 assert isinstance(ebm_df_eval, pd.DataFrame)
 
                 base_learner_prediction = self.learning_rate * pd.Series(
@@ -127,5 +108,5 @@ class AdditiveModelWrapper:
         return self.base_learners_list
 
     @staticmethod
-    def __neg_gradient(y, y_hat):
+    def _neg_gradient(y, y_hat):
         return y - y_hat

@@ -9,7 +9,7 @@ def test_find_labelled_path_in_molecule_graph():
     graph = dataset[0]
     #atomic numbers
     path_labels = [25, 16]
-    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, id_label_name="feature_atomic_number")
+    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, main_label_name="feature_atomic_number")
     assert result == [('0', '2')]
 
 def test_find_labelled_path_in_nx_graph_single_path():
@@ -21,7 +21,7 @@ def test_find_labelled_path_in_nx_graph_single_path():
     ])
     graph.add_edges_from([(1, 2), (2, 3)])
     path_labels = ["A", "B", "C"]
-    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, id_label_name="label")
+    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, main_label_name="label")
     assert result == [(1, 2, 3)]
 
 
@@ -34,7 +34,7 @@ def test_find_labelled_path_in_nx_graph_no_path():
     ])
     graph.add_edges_from([(1, 2), (2, 3)])
     path_labels = ["A", "B", "C"]
-    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, id_label_name="label")
+    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, main_label_name="label")
     assert result == []
 
 
@@ -50,7 +50,7 @@ def test_find_labelled_path_in_nx_graph_multiple_paths():
     ])
     graph.add_edges_from([(1, 2), (2, 3), (4, 5), (5, 6)])
     path_labels = ["A", "B", "C"]
-    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, id_label_name="label")
+    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, main_label_name="label")
     assert set(result) == {(1, 2, 3), (4, 5, 6)}
 
 
@@ -66,7 +66,7 @@ def test_find_labelled_path_in_nx_graph_with_disconnected_graph():
     ])
     graph.add_edges_from([(1, 2), (2, 3)])
     path_labels = ["A", "B", "C"]
-    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, id_label_name="label")
+    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, main_label_name="label")
     assert result == [(1, 2, 3)]
 
 
@@ -80,7 +80,7 @@ def test_find_labelled_path_in_nx_graph_partial_match():
     ])
     graph.add_edges_from([(1, 2), (2, 3), (3, 4)])
     path_labels = ["B", "C"]
-    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, id_label_name="label")
+    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, main_label_name="label")
     assert result == [(2, 3)]
 
 
@@ -97,5 +97,5 @@ def test_find_labelled_path_length_1_in_nx_graph():
     ])
     graph.add_edges_from([(1, 2), (2, 3)])
     path_labels = ["A"]
-    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, id_label_name="label")
+    result = ExtendedBoostingMatrix.find_labelled_path_in_nx_graph(graph, path_labels, main_label_name="label")
     assert set(result) == {(1,),(4,)}

@@ -32,6 +32,7 @@ def test_on_molecules_dataset():
 
     assert result.isin([[]]).any().any() == False
 
+
 def test_initialize_boosting_matrix_for_training_with_node_and_edge_attributes():
     graph = nx.Graph()
     graph.add_nodes_from([
@@ -124,23 +125,35 @@ def test_initialize_boosting_matrix_for_training_no_paths_found():
 
 
 def test_initialize_boosting_matrix_for_training_multiple_anchor_labels():
-    graph = nx.Graph()
-    graph.add_nodes_from([
-        (1, {"label": 1}),
+    graph_1 = nx.Graph()
+    graph_1.add_nodes_from([
+        (1, {"label": 1, "attr": 10}),
         (2, {"label": 2}),
         (3, {"label": 3})
     ])
-    graph.add_edges_from([(1, 2), (2, 3)])
-    dataset = [graph]
+    graph_1.add_edges_from([(1, 2), (2, 3)])
+
+    graph_2 = nx.Graph()
+    graph_2.add_nodes_from([
+        (1, {"label": 2}),
+        (2, {"label": 2}),
+        (3, {"label": 3})
+    ])
+    graph_2.add_edges_from([(1, 2), (2, 3)])
+    dataset = [graph_1, graph_2]
     list_anchor_nodes_labels = [1, 2]
+
     id_label_name = "label"
 
     result = ExtendedBoostingMatrix.initialize_boosting_matrix_with_anchor_nodes_attributes(
         dataset, list_anchor_nodes_labels, id_label_name
     )
-
+    assert set(result.columns) == {'(1,)_label', '(1,)_attr', '(1,)_n_times_present', '(2,)_label',
+                                   '(2,)_n_times_present'}
+    assert result['(2,)_n_times_present'].equals( pd.Series([1, 2]))
+    assert result['(1,)_n_times_present'].equals(pd.Series([1, 0]))
     assert isinstance(result, pd.DataFrame)
-    assert len(result) == 1
+    assert len(result) == 2
 
 
 def test_initialize_boosting_matrix_for_training_empty_dataset():
@@ -249,5 +262,3 @@ def test_initialize_boosting_matrix_for_training_with_edge_attributes():
     assert isinstance(result, pd.DataFrame)
     assert len(result) == 1
     assert set(result.columns)  # Expected column names would go here if mocking attributes
-
-

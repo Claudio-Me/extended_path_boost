@@ -16,7 +16,7 @@ def test_find_labelled_path_in_nx_graph_single_path():
 
     path_labels = [1, 2, 3]
     result = ExtendedBoostingMatrix._find_labelled_path_in_nx_graph_from_starting_node(
-        graph, path_labels, id_label_name="label", starting_node=1
+        graph, path_labels, main_label_name="label", starting_node=1
     )
     assert set(result) == {(1, 2, 3)}
 
@@ -33,7 +33,7 @@ def test_find_labelled_path_in_nx_graph_multiple_paths():
 
     path_labels = [1, 2, 3]
     result = ExtendedBoostingMatrix._find_labelled_path_in_nx_graph_from_starting_node(
-        graph, path_labels, id_label_name="label", starting_node=1
+        graph, path_labels, main_label_name="label", starting_node=1
     )
     assert set(result) == {(1, 2, 3), (1, 2, 4)}
 
@@ -49,7 +49,7 @@ def test_find_labelled_path_in_nx_graph_no_path():
 
     path_labels = [1, 2, 3]
     result = ExtendedBoostingMatrix._find_labelled_path_in_nx_graph_from_starting_node(
-        graph, path_labels, id_label_name="label", starting_node=1
+        graph, path_labels, main_label_name="label", starting_node=1
     )
     assert result == []
 
@@ -65,7 +65,7 @@ def test_find_labelled_path_in_nx_graph_starting_node_not_in_path():
 
     path_labels = [1, 2, 3]
     result = ExtendedBoostingMatrix._find_labelled_path_in_nx_graph_from_starting_node(
-        graph, path_labels, id_label_name="label", starting_node=2
+        graph, path_labels, main_label_name="label", starting_node=2
     )
     assert result == []
 
@@ -81,7 +81,7 @@ def test_find_labelled_path_in_nx_graph_circular_path():
 
     path_labels = [1, 2, 3]
     result = ExtendedBoostingMatrix._find_labelled_path_in_nx_graph_from_starting_node(
-        graph, path_labels, id_label_name="label", starting_node=1
+        graph, path_labels, main_label_name="label", starting_node=1
     )
     assert set(result) == {(1, 2, 3)}
 
@@ -100,7 +100,7 @@ def test_find_labelled_path_in_nx_graph_disconnected_graph():
 
     path_labels = [1, 2, 3]
     result = ExtendedBoostingMatrix._find_labelled_path_in_nx_graph_from_starting_node(
-        graph, path_labels, id_label_name="label", starting_node=4
+        graph, path_labels, main_label_name="label", starting_node=4
     )
     assert set(result) == {(4, 5, 6)}
 
@@ -117,7 +117,7 @@ def test_find_labelled_path_in_nx_graph_loop_graph():
 
     path_labels = [2, 3, 3]
     result = ExtendedBoostingMatrix._find_labelled_path_in_nx_graph_from_starting_node(
-        graph, path_labels, id_label_name="label", starting_node=2
+        graph, path_labels, main_label_name="label", starting_node=2
     )
     assert set(result) == {(2, 3, 4), (2, 3, 5), (2, 4, 5), (2, 4, 3)}
 
