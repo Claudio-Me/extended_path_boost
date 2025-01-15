@@ -15,49 +15,51 @@ import ast
 
 
 class ExtendedBoostingMatrix:
-    frequency_column_name = "n_times_present"
+    frequency_column_name: str = "n_times_present"
 
     def __init__(self):
         pass
 
     @staticmethod
-    def generate_new_columns_from_columns_names(dataset: list[nx.Graph], ebm_to_be_expanded: pd.DataFrame,
-                                                columns_names: Iterable[str], main_label_name: str) -> pd.DataFrame:
+    def generate_new_columns_from_columns_names(dataset: list[nx.Graph], columns_names: Iterable[str],
+                                                main_label_name: str,
+                                                ebm_to_be_expanded: pd.DataFrame | None = None) -> pd.DataFrame:
         new_columns = None
 
         # find paths names in column_names
-        paths = set()
+        # for each path find which column in columns_names are related to it
+        columns_for_each_path = defaultdict(lambda: [])
         for column in columns_names:
             path_labels = ExtendedBoostingMatrix.get_path_from_column_name(column)
-            paths.add(path_labels)
-        paths = list(paths)
-        path_str = [str(path) for path in paths]
-        columns_for_each_path = defaultdict(lambda: [])
-        for i, path_name in enumerate(path_str):
-            for column in columns_names:
-                if column.startswith(path_name):
-                    columns_for_each_path[paths[i]].append(column)
+            columns_for_each_path[path_labels].append(column)
 
-        for path_labels, columns_names in columns_for_each_path.items():
+        for path_labels, columns_names_referring_to_path in columns_for_each_path.items():
             frequency_column_name = \
                 ExtendedBoostingMatrix.generate_name_of_columns_for(path_labels[:-1],
                                                                     [ExtendedBoostingMatrix.frequency_column_name])[0]
 
-            if frequency_column_name in ebm_to_be_expanded.columns:
+            if (ebm_to_be_expanded is not None) and (frequency_column_name in ebm_to_be_expanded.columns):
                 frequency_column = ebm_to_be_expanded[frequency_column_name]
             else:
-                frequency_column = [1] * len(ebm_to_be_expanded)
+                frequency_column = [1] * len(dataset)
 
             expanded_columns = ExtendedBoostingMatrix.generate_new_columns_from_path_labels(dataset=dataset,
                                                                                             path_labels=path_labels,
                                                                                             main_label_name=main_label_name,
                                                                                             frequency_column=frequency_column)
-            expanded_columns = expanded_columns[columns_names]
+
+            filtered_columns_names = [col for col in columns_names_referring_to_path if col in expanded_columns.columns]
+            expanded_columns = expanded_columns[filtered_columns_names]
 
             if new_columns is None:
                 new_columns = expanded_columns
             else:
                 new_columns = pd.concat([new_columns, expanded_columns], axis=1)
+
+        # Check if new_columns contains all columns_names and add missing columns
+        missing_columns = [column for column in columns_names if column not in new_columns.columns]
+        missing_df = pd.DataFrame({col: [None] * len(new_columns) for col in missing_columns})
+        new_columns = pd.concat([new_columns, missing_df], axis=1)
 
         return new_columns
 
@@ -95,7 +97,10 @@ class ExtendedBoostingMatrix:
                 columns_for_dataframe[frequency_column_name][graph_number] = len(paths_found)
 
         new_df_columns = pd.DataFrame(columns_for_dataframe)
-        new_df_columns = new_df_columns.map(lambda x: None if isinstance(x, list) and len(x) == 0 else x)
+        new_df_columns = ExtendedBoostingMatrix._remove_empty_list_values_from_df(new_df_columns)
+
+
+
         return new_df_columns
 
     @staticmethod
@@ -163,8 +168,7 @@ class ExtendedBoostingMatrix:
                 columns_for_dataframe[key][graph_number] = value
 
         new_df_columns = pd.DataFrame(columns_for_dataframe)
-        new_df_columns = new_df_columns.map(
-            lambda x: None if isinstance(x, list) and len(x) == 0 else x)
+        new_df_columns = ExtendedBoostingMatrix._remove_empty_list_values_from_df(new_df_columns)
         return new_df_columns
 
     @staticmethod
@@ -345,9 +349,20 @@ class ExtendedBoostingMatrix:
             else:
                 extended_boosting_matrix_df = pd.concat([extended_boosting_matrix_df, columns_for_anchor_node], axis=1)
 
-        extended_boosting_matrix_df = extended_boosting_matrix_df.map(
-            lambda x: None if isinstance(x, list) and len(x) == 0 else x)
+        extended_boosting_matrix_df = ExtendedBoostingMatrix._remove_empty_list_values_from_df(extended_boosting_matrix_df)
+
+
+
         return extended_boosting_matrix_df
+
+    @staticmethod
+    def _remove_empty_list_values_from_df(df: pd.DataFrame) -> pd.DataFrame:
+        modified_df=df.map(lambda x: np.nan if isinstance(x, list) and len(x) == 0 else x)
+        # the entries of the columns "(path)_n_times_present" are nan if the path is not present in the graph, we convert nan to 0
+        columns_to_replace = [col for col in modified_df.columns if
+                              ExtendedBoostingMatrix.frequency_column_name in col]
+        modified_df[columns_to_replace] = modified_df[columns_to_replace].fillna(0).astype(int)
+        return modified_df
 
     @staticmethod
     def get_attribute_name_from_column_name(column_name: str) -> str:
@@ -363,7 +378,8 @@ class ExtendedBoostingMatrix:
 
     @staticmethod
     def get_frequency_boosting_matrix(train_ebm_dataframe: pd.DataFrame) -> pd.DataFrame:
-        selected_columns = [column for column in train_ebm_dataframe.columns if 'n_times_present' in column]
+        selected_columns = [column for column in train_ebm_dataframe.columns if
+                            ExtendedBoostingMatrix.frequency_column_name in column]
         return train_ebm_dataframe[selected_columns]
 
     @staticmethod
@@ -378,34 +394,3 @@ class ExtendedBoostingMatrix:
                 columns_to_keep.append(column)
 
         return columns_to_keep
-
-    # ------------------------------------------------------------------
-    # old methods of the class
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
