@@ -7,7 +7,6 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import pickle
 import os
-
 from extended_path_boost import PathBoost
 
 
@@ -19,24 +18,34 @@ from extended_path_boost import PathBoost
 def parameters():
     return {"n_iter": 100, "max_path_length": 10, "learning_rate": 0.1, "base_learner": "Tree",
             "selector": "tree", "base_learner_parameters": None,
-            "anchor_nodes": [21, 22, 23, 24, 25, 26, 27, 28, 29, 30,  # first block
-                             39, 40, 41, 42, 43, 44, 45, 46, 47, 48,  # second block
-                             57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71,  # lanthanides
-                             72, 73, 74, 75, 76, 77, 78, 79, 80,  # third block
-                             89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103,  # actinides
-                             104, 105, 106, 107, 108, 109, 110, 111, 112]  # fourth block}
+            "anchor_nodes": [(1,), (2,)], "anchor_nodes_label_name": "label"
             }
 
-
 @pytest.fixture
-def nx_graphs()->tuple[list[nx.Graph], np.ndarray]:
-    path_to_file = os.path.join('test_datasets', 'uNatQ_nx_graphs_subsample.pkl')
-    with open(path_to_file, "rb") as f:
-        graphs = pickle.load(f)
+def nx_graphs() -> tuple[list[nx.Graph], np.ndarray]:
+    """Fixture to create sample graph data and target values for tests."""
+    G1 = nx.Graph()
+    G1.add_nodes_from([
+        (1, {"attr1": 1, "label": 1}),
+        (2, {"attr2": 2, "label": 2}),
+        (3, {"attr3": 3, "label": 2}),
+        (4, {"attr4": 4, "label": 3}),
+        (5, {"attr5": 5, "label": 4})
+    ])
+    G1.add_edges_from([
+        (1, 2, {"attr6": 6}),
+        (2, 3, {"attr7": 7}),
+        (3, 4, {"attr8": 8}),
+        (4, 5, {"attr9": 9}),
+        (1, 5, {"attr10": 10})
+    ])
 
-    y = np.array([graph.graph['target_tzvp_homo_lumo_gap'] for graph in graphs])
+    G2 = nx.Graph()
+    G2.add_edges_from([(0, 1), (1, 3)])
+    graphs = [G1, G2]
+    target = np.array([1.0, 2.0])
 
-    return graphs, y
+    return graphs, target
 
 
 def test_dataset_splitting(nx_graphs, parameters):
@@ -45,9 +54,8 @@ def test_dataset_splitting(nx_graphs, parameters):
 
     # assert est.demo_param == "demo_param"
 
-
-
-    path_boost.fit(nx_graphs[0], nx_graphs[1])
+    path_boost.fit(nx_graphs[0], nx_graphs[1], list_anchor_nodes_labels=parameters["anchor_nodes"],
+                   anchor_nodes_label_name=parameters["anchor_nodes_label_name"])
     assert hasattr(path_boost, "is_fitted_")
 
     X = nx_graphs[0]

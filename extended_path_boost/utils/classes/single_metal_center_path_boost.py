@@ -1,5 +1,6 @@
 import networkx as nx
 import pandas as pd
+import numbers
 from sklearn.base import BaseEstimator
 import numpy as np
 from .extended_boosting_matrix import ExtendedBoostingMatrix
@@ -11,19 +12,20 @@ from matplotlib.ticker import MaxNLocator
 
 
 class SingleMetalCenterPathBoost(BaseEstimator):
-    def __init__(self, n_iter=100, max_path_length=10, learning_rate=0.1, BaseLearner=DecisionTreeRegressor,
-                 kwargs_for_base_learner=None, Selector=DecisionTreeRegressor, kwargs_for_selector=None, verbose=False):
+    def __init__(self, n_iter=100, max_path_length=10, learning_rate=0.1, BaseLearnerClass=DecisionTreeRegressor,
+                 kwargs_for_base_learner=None, SelectorClass=DecisionTreeRegressor, kwargs_for_selector=None,
+                 verbose=False):
         if kwargs_for_base_learner is None:
             kwargs_for_base_learner = {}
         self.n_iter = n_iter
         self.max_path_length = max_path_length
         self.learning_rate = learning_rate
-        self.BaseLearnerClass = BaseLearner
+        self.BaseLearnerClass = BaseLearnerClass
         self.verbose = verbose
         # very basic logic in the __init__ it is just to have a more clean code, it set kwargs with default dictionaries if no other input is given, it is possible to move the dictionaries as default parameters
-        self.kwargs_for_base_learner = kwargs_for_base_learner or {'max_depth': 4, 'random_state': 0,
+        self.kwargs_for_base_learner = kwargs_for_base_learner or {'max_depth': 3, 'random_state': 0,
                                                                    'splitter': 'best', 'criterion': "squared_error"}
-        self.SelectorClass = Selector
+        self.SelectorClass = SelectorClass
         self.kwargs_for_selector = kwargs_for_selector or {'max_depth': 1, 'random_state': 0, 'splitter': 'best',
                                                            'criterion': "squared_error"}
 
@@ -57,7 +59,6 @@ class SingleMetalCenterPathBoost(BaseEstimator):
             None, the function assumes all preprocessing and validation steps have been
             handled externally.
         """
-
 
         self._validate_data(X=X, y=y, list_anchor_nodes_labels=list_anchor_nodes_labels,
                             name_of_label_attribute=name_of_label_attribute, eval_set=eval_set)
@@ -96,8 +97,7 @@ class SingleMetalCenterPathBoost(BaseEstimator):
                                             eval_set=self.eval_set_ebm_df_and_target_)
 
             # expand the ebm dataframe with the new columns starting from the selected path
-            self._expand_ebm_dataframe(X=X, selected_path=best_path, main_label_name=name_of_label_attribute,
-                                       eval_set=eval_set)
+            self._expand_ebm_dataframe(X=X, selected_path=best_path, main_label_name=name_of_label_attribute)
 
         self.train_mse_ = self.base_learner_.train_mse
         if eval_set is not None:
@@ -111,8 +111,10 @@ class SingleMetalCenterPathBoost(BaseEstimator):
         if eval_set is not None:
             columns_names = ExtendedBoostingMatrix.get_columns_related_to_path(best_path,
                                                                                self.train_ebm_dataframe_.columns)
-            for eval_set_number, eval_set_dataset_target in enumerate(eval_set):
-                eval_set_dataset, y_eval_set = eval_set_dataset_target
+            for eval_set_number, eval_set_tuple in enumerate(eval_set):
+                if eval_set_tuple is None:
+                    continue
+                eval_set_dataset, y_eval_set = eval_set_tuple
                 # find the new columns in the eval set
                 missing_columns = [col for col in columns_names if
                                    col not in self.eval_set_ebm_df_and_target_[eval_set_number][0].columns]
@@ -140,12 +142,21 @@ class SingleMetalCenterPathBoost(BaseEstimator):
 
         return ebm_dataframe
 
-    def predict(self, X: list[nx.Graph] | None = None, ebm_dataframe: pd.DataFrame | None = None):
+    def predict(self, X: list[nx.Graph] | None = None, ebm_dataframe: pd.DataFrame | None = None) -> list[
+        numbers.Number]:
         assert X is not None or ebm_dataframe is not None
         assert self.is_fitted_
         if ebm_dataframe is None:
             ebm_dataframe = self.generate_ebm_for_dataset(dataset=X)
         return self.base_learner_.predict(ebm_dataframe)
+
+    def predict_step_by_step(self, X: list[nx.Graph] | None = None, ebm_dataframe: pd.DataFrame | None = None) -> list[
+        np.array]:
+        assert X is not None or ebm_dataframe is not None
+        assert self.is_fitted_
+        if ebm_dataframe is None:
+            ebm_dataframe = self.generate_ebm_for_dataset(dataset=X)
+        return self.base_learner_.predict_step_by_step(ebm_dataframe)
 
     def evaluate(self, X: list[nx.Graph] | None = None, y=None, ebm_dataframe: pd.DataFrame | None = None):
         # it returns the evolution of the mse for each iteration
@@ -156,7 +167,7 @@ class SingleMetalCenterPathBoost(BaseEstimator):
             ebm_dataframe = self.generate_ebm_for_dataset(dataset=X)
         return self.base_learner_.evaluate(ebm_dataframe, y)
 
-    def _expand_ebm_dataframe(self, X: list[nx.Graph], selected_path, main_label_name: str, eval_set=None):
+    def _expand_ebm_dataframe(self, X: list[nx.Graph], selected_path, main_label_name: str):
         if selected_path in self.paths_selected_by_epb_:
             return
         elif len(selected_path) >= self.max_path_length:
@@ -185,13 +196,18 @@ class SingleMetalCenterPathBoost(BaseEstimator):
         if eval_set is None:
             pass
         else:
-            for dataset, y_eval_set in eval_set:
-                # prepare extended boosting matrix for eval dataset
-                eval_set_ebm_dataframe = ExtendedBoostingMatrix.initialize_boosting_matrix_with_anchor_nodes_attributes(
-                    dataset=dataset,
-                    list_anchor_nodes_labels=list_anchor_nodes_labels,
-                    id_label_name=main_label_name)
-                self.eval_set_ebm_df_and_target_.append([eval_set_ebm_dataframe, y_eval_set])
+            for eval_tuple in eval_set:
+                if eval_tuple is None:
+                    self.eval_set_ebm_df_and_target_.append(None)
+                    continue
+                else:
+                    eval_dataset, y_eval_set = eval_tuple
+                    # prepare extended boosting matrix for eval dataset
+                    eval_set_ebm_dataframe = ExtendedBoostingMatrix.initialize_boosting_matrix_with_anchor_nodes_attributes(
+                        dataset=eval_dataset,
+                        list_anchor_nodes_labels=list_anchor_nodes_labels,
+                        id_label_name=main_label_name)
+                    self.eval_set_ebm_df_and_target_.append([eval_set_ebm_dataframe, y_eval_set])
 
         # initialize base learner wrapper
         self.base_learner_: AdditiveModelWrapper = AdditiveModelWrapper(BaseModelClass=self.BaseLearnerClass,
@@ -223,21 +239,22 @@ class SingleMetalCenterPathBoost(BaseEstimator):
         list_anchor_nodes_labels = check_params.get('list_anchor_nodes_labels', None)
         if list_anchor_nodes_labels is not None:
             # Ensure each element in list_anchor_nodes_labels is a tuple
-            for i, label in enumerate(list_anchor_nodes_labels):
-                if not isinstance(label, tuple):
-                    if hasattr(label, '__iter__') and not isinstance(label, str):
-                        list_anchor_nodes_labels[i] = tuple(label)
+            len_list_anchor_nodes_labels = len(list_anchor_nodes_labels)
+            for i in range(len_list_anchor_nodes_labels):
+                if not isinstance(list_anchor_nodes_labels[i], tuple):
+                    if hasattr(list_anchor_nodes_labels[i], '__iter__') and not isinstance(list_anchor_nodes_labels[i],
+                                                                                           str):
+                        list_anchor_nodes_labels[i] = tuple(list_anchor_nodes_labels[i])
                     else:
-                        list_anchor_nodes_labels[i] = tuple([label])
+                        list_anchor_nodes_labels[i] = tuple([list_anchor_nodes_labels[i]])
 
     def plot_training_and_eval_errors(self):
         """
         Plots the training and evaluation set errors over iterations.
         """
         # skip_the_first n iterations
-        n=int(2/self.learning_rate)
+        n = int(2 / self.learning_rate)
         train_mse = self.train_mse_[n:]
-
 
         plt.figure(figsize=(12, 6))
 
@@ -250,13 +267,11 @@ class SingleMetalCenterPathBoost(BaseEstimator):
             num_iterations = len(eval_sets_mse)
             num_eval_sets = len(eval_sets_mse[0])
             for eval_set_index in range(num_eval_sets):
-                eval_set_errors = [eval_sets_mse[iteration][eval_set_index] for iteration in
-                                   range(num_iterations)]
-                plt.plot(range(n, num_iterations + n), eval_set_errors,
-                         label=f'Evaluation Set {eval_set_index + 1} Error', marker='.')
-
-
-
+                if eval_sets_mse[0][eval_set_index] is not None:
+                    eval_set_errors = [eval_sets_mse[iteration][eval_set_index] for iteration in
+                                       range(num_iterations)]
+                    plt.plot(range(n, num_iterations + n), eval_set_errors,
+                             label=f'Evaluation Set {eval_set_index + 1} Error', marker='.')
 
         plt.xlabel('Iteration')
         plt.ylabel('Mean Squared Error')

@@ -34,8 +34,12 @@ class AdditiveModelWrapper:
 
         self.trained_ = True
         if eval_set is not None and not hasattr(self, '_last_eval_set_prediction_'):
-            self._last_eval_set_prediction_ = [pd.Series(np.zeros(len(ebm_df)), index=ebm_df.index) for ebm_df, _
-                                               in eval_set]
+            self._last_eval_set_prediction_ =[]
+            for eval_tuple in eval_set:
+                if eval_tuple is None:
+                    self._last_eval_set_prediction_.append(None)
+                else:
+                    self._last_eval_set_prediction_.append(pd.Series(np.zeros(len(eval_tuple[0])), index=eval_tuple[0].index))
 
         if len(self.base_learners_list) == 0:
             # it is the first time we fit it so we do not need to compute the neg gradient
@@ -64,9 +68,9 @@ class AdditiveModelWrapper:
             # ----------------------------------------------------------------------------------------
             # debugging
             # Plot the tree
-            #plt.figure(figsize=(12, 8))
-            #tree.plot_tree(new_base_learner, filled=True, feature_namesTrue)
-            #plt.show()
+            # plt.figure(figsize=(12, 8))
+            # tree.plot_tree(new_base_learner, filled=True, feature_namesTrue)
+            # plt.show()
             # ----------------------------------------------------------------------------------------
 
             self.base_learners_list.append(new_base_learner)
@@ -79,36 +83,40 @@ class AdditiveModelWrapper:
             self.train_mse.append(train_mse)
 
         if eval_set is not None:
-            eval_set_mse = []
+            eval_set_mse = [None for _ in range(len(eval_set))]
             for i, eval_tuple in enumerate(eval_set):
+                if eval_tuple is None:
+                    self._last_eval_set_prediction_[i]= None
+                    continue
                 ebm_df_eval, y_eval = eval_tuple
                 assert isinstance(ebm_df_eval, pd.DataFrame)
 
                 base_learner_prediction = self.learning_rate * new_base_learner.predict(ebm_df_eval[columns_to_keep])
 
                 self._last_eval_set_prediction_[i] += base_learner_prediction
-                eval_set_mse.append(mean_squared_error(y_true=y_eval, y_pred=self._last_eval_set_prediction_[i]))
+                eval_set_mse[i] = mean_squared_error(y_true=y_eval, y_pred=self._last_eval_set_prediction_[i])
 
             self.eval_sets_mse.append(eval_set_mse)
 
         return self
 
     def predict(self, X: pd.DataFrame, **kwargs):
-        predictions = self._predictions_step_by_step(X, **kwargs)
+        predictions = self.predict_step_by_step(X, **kwargs)
         return predictions[-1]
 
-    def _predictions_step_by_step(self, X: pd.DataFrame, **kwargs) -> list[np.array]:
+
+    def predict_step_by_step(self, X: pd.DataFrame, **kwargs) -> list[np.array]:
         prediction = []
-        last_prediction= np.zeros(len(X))
+        last_prediction = np.zeros(len(X))
         for i, base_learner in enumerate(self.base_learners_list):
             chosen_columns = self.considered_columns[i]
             last_prediction += self.learning_rate * np.array(base_learner.predict(X[chosen_columns], **kwargs))
             prediction.append(copy.deepcopy(last_prediction))
         return prediction
 
-    def evaluate(self, X: pd.DataFrame, y: Iterable, **kwargs):
+    def evaluate(self, X: pd.DataFrame, y: Iterable, **kwargs)-> list[float]:
         # it returns the evolution of the mse with increasing number of iterations
-        predictions = self._predictions_step_by_step(X, **kwargs)
+        predictions = self.predict_step_by_step(X, **kwargs)
         evolution_mse = []
         for prediction in predictions:
             mse = mean_squared_error(y_true=y, y_pred=prediction)

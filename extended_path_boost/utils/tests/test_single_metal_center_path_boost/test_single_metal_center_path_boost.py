@@ -23,9 +23,9 @@ def test_single_metal_center_path_boost_initialization():
         n_iter=50,
         max_path_length=5,
         learning_rate=0.05,
-        BaseLearner=DecisionTreeRegressor,
+        BaseLearnerClass=DecisionTreeRegressor,
         kwargs_for_base_learner={"max_depth": 3},
-        Selector=DecisionTreeRegressor,
+        SelectorClass=DecisionTreeRegressor,
         kwargs_for_selector={"max_features": "sqrt"}
     )
     assert model.n_iter == 50
