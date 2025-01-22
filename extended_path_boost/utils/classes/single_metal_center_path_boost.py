@@ -1,17 +1,18 @@
 import networkx as nx
 import pandas as pd
 import numbers
-from sklearn.base import BaseEstimator
+import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.base import BaseEstimator
+from sklearn.base import RegressorMixin
 from .extended_boosting_matrix import ExtendedBoostingMatrix
 from typing import Iterable
 from sklearn.tree import DecisionTreeRegressor
 from .additive_model_wrapper import AdditiveModelWrapper
-import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 
-class SingleMetalCenterPathBoost(BaseEstimator):
+class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
     def __init__(self, n_iter=100, max_path_length=10, learning_rate=0.1, BaseLearnerClass=DecisionTreeRegressor,
                  kwargs_for_base_learner=None, SelectorClass=DecisionTreeRegressor, kwargs_for_selector=None,
                  verbose=False):
@@ -100,6 +101,7 @@ class SingleMetalCenterPathBoost(BaseEstimator):
             self._expand_ebm_dataframe(X=X, selected_path=best_path, main_label_name=name_of_label_attribute)
 
         self.train_mse_ = self.base_learner_.train_mse
+
         if eval_set is not None:
             self.eval_sets_mse_ = self.base_learner_.eval_sets_mse
 
@@ -264,13 +266,11 @@ class SingleMetalCenterPathBoost(BaseEstimator):
         # Plot evaluation set errors if available
         if hasattr(self, 'eval_sets_mse_'):
             eval_sets_mse = self.eval_sets_mse_[n:]
-            num_iterations = len(eval_sets_mse)
-            num_eval_sets = len(eval_sets_mse[0])
+            num_iterations = len(eval_sets_mse[0])
+            num_eval_sets = len(eval_sets_mse)
             for eval_set_index in range(num_eval_sets):
-                if eval_sets_mse[0][eval_set_index] is not None:
-                    eval_set_errors = [eval_sets_mse[iteration][eval_set_index] for iteration in
-                                       range(num_iterations)]
-                    plt.plot(range(n, num_iterations + n), eval_set_errors,
+                if eval_sets_mse[eval_set_index][0] is not None:
+                    plt.plot(range(n, num_iterations + n), eval_sets_mse[eval_set_index],
                              label=f'Evaluation Set {eval_set_index + 1} Error', marker='.')
 
         plt.xlabel('Iteration')

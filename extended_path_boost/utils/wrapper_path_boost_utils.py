@@ -42,10 +42,9 @@ def train_pattern_boosting(input_from_parallelization: tuple):
         return None
     X = input_from_parallelization[1]
     y = input_from_parallelization[2]
-    eval_set = input_from_parallelization[3]
-    list_anchor_nodes_labels: tuple = input_from_parallelization[4]
-    name_of_label_attribute = input_from_parallelization[5]
-    model.fit(X=X, y=y, eval_set=eval_set, list_anchor_nodes_labels=[list_anchor_nodes_labels],
+    list_anchor_nodes_labels: tuple = input_from_parallelization[3]
+    name_of_label_attribute = input_from_parallelization[4]
+    model.fit(X=X, y=y, eval_set=None, list_anchor_nodes_labels=[list_anchor_nodes_labels],
               name_of_label_attribute=name_of_label_attribute)
     return model
 

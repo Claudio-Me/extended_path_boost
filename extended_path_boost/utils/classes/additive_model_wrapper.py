@@ -34,12 +34,13 @@ class AdditiveModelWrapper:
 
         self.trained_ = True
         if eval_set is not None and not hasattr(self, '_last_eval_set_prediction_'):
-            self._last_eval_set_prediction_ =[]
+            self._last_eval_set_prediction_ = []
             for eval_tuple in eval_set:
                 if eval_tuple is None:
                     self._last_eval_set_prediction_.append(None)
                 else:
-                    self._last_eval_set_prediction_.append(pd.Series(np.zeros(len(eval_tuple[0])), index=eval_tuple[0].index))
+                    self._last_eval_set_prediction_.append(
+                        pd.Series(np.zeros(len(eval_tuple[0])), index=eval_tuple[0].index))
 
         if len(self.base_learners_list) == 0:
             # it is the first time we fit it so we do not need to compute the neg gradient
@@ -83,10 +84,11 @@ class AdditiveModelWrapper:
             self.train_mse.append(train_mse)
 
         if eval_set is not None:
-            eval_set_mse = [None for _ in range(len(eval_set))]
+            this_iter_eval_set_mse: list[float | None] = [None for _ in range(len(eval_set))]
+
             for i, eval_tuple in enumerate(eval_set):
                 if eval_tuple is None:
-                    self._last_eval_set_prediction_[i]= None
+                    self._last_eval_set_prediction_[i] = None
                     continue
                 ebm_df_eval, y_eval = eval_tuple
                 assert isinstance(ebm_df_eval, pd.DataFrame)
@@ -94,16 +96,20 @@ class AdditiveModelWrapper:
                 base_learner_prediction = self.learning_rate * new_base_learner.predict(ebm_df_eval[columns_to_keep])
 
                 self._last_eval_set_prediction_[i] += base_learner_prediction
-                eval_set_mse[i] = mean_squared_error(y_true=y_eval, y_pred=self._last_eval_set_prediction_[i])
+                this_iter_eval_set_mse[i] = mean_squared_error(y_true=y_eval, y_pred=self._last_eval_set_prediction_[i])
 
-            self.eval_sets_mse.append(eval_set_mse)
+            if len(self.eval_sets_mse) == 0:
+                for eval_set_error in this_iter_eval_set_mse:
+                    self.eval_sets_mse.append([eval_set_error])
+            else:
+                for i, eval_set_error in enumerate(this_iter_eval_set_mse):
+                    self.eval_sets_mse[i].append(eval_set_error)
 
         return self
 
     def predict(self, X: pd.DataFrame, **kwargs):
         predictions = self.predict_step_by_step(X, **kwargs)
         return predictions[-1]
-
 
     def predict_step_by_step(self, X: pd.DataFrame, **kwargs) -> list[np.array]:
         prediction = []
@@ -114,7 +120,7 @@ class AdditiveModelWrapper:
             prediction.append(copy.deepcopy(last_prediction))
         return prediction
 
-    def evaluate(self, X: pd.DataFrame, y: Iterable, **kwargs)-> list[float]:
+    def evaluate(self, X: pd.DataFrame, y: Iterable, **kwargs) -> list[float]:
         # it returns the evolution of the mse with increasing number of iterations
         predictions = self.predict_step_by_step(X, **kwargs)
         evolution_mse = []

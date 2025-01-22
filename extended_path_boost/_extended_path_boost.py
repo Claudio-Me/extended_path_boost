@@ -30,10 +30,11 @@ from sklearn.utils.validation import check_is_fitted
 from .utils.classes.single_metal_center_path_boost import SingleMetalCenterPathBoost
 from .utils import wrapper_path_boost_utils as wbu
 from sklearn.tree import DecisionTreeRegressor
+from sklearn.base import RegressorMixin
 from matplotlib.ticker import MaxNLocator
 
 
-class PathBoost(BaseEstimator):
+class PathBoost(BaseEstimator, RegressorMixin):
     """A template estimator to be used as a reference implementation.
 
     For more information regarding how to build your own estimator, read more
@@ -127,30 +128,12 @@ class PathBoost(BaseEstimator):
             anchor_nodes_label_name=self.anchor_nodes_label_name_,
             anchor_nodes=self.list_anchor_nodes_labels_)
 
-        if eval_set is not None:
-            index_of_eval_graphs_for_each_anchor_label: list[list[list[int]]] = []
-            for eval_tuple in eval_set:
-                indexes_for_eval_tuple = wbu.split_dataset_by_metal_centers(
-                    graphs_list=eval_tuple[0],
-                    anchor_nodes_label_name=self.anchor_nodes_label_name_,
-                    anchor_nodes=self.list_anchor_nodes_labels_)
-
-                index_of_eval_graphs_for_each_anchor_label.append(indexes_for_eval_tuple)
-
         train_datasets_for_each_anchor_label = []
         train_labels_for_each_anchor_label = []
 
-        # quantities for eval set
-        if eval_set is not None:
-            eval_sets_for_each_anchor_label: list[list[tuple[list[nx.Graph], Iterable[numbers.Number]]]] = [
-                [None for _ in range(len(eval_set))] for _ in range(len(self.list_anchor_nodes_labels_))]
-
-        else:
-            eval_sets_for_each_anchor_label = [None for _ in range(len(indexes_of_train_graphs_for_each_anchor_label))]
-
         self.models_list_: list[SingleMetalCenterPathBoost] = []
 
-        # create a train dataset, model and eval dataset for each anchor node
+        # create a train dataset and model
         for i, _ in enumerate(self.list_anchor_nodes_labels_):
             train_indexes = indexes_of_train_graphs_for_each_anchor_label[i]
             train_dataset = [X[index] for index in train_indexes]
@@ -168,28 +151,10 @@ class PathBoost(BaseEstimator):
                 # if there is no training data, we will append None to the list of models
                 self.models_list_.append(None)
 
-            # divide eval set by anchor node
-            # -------------------------------------------------------------------------------------------------
-            # TODO: this part of the code is not clear, it is not clear what is the purpose of this part of the code
-
-            if eval_set is not None:
-
-                for eval_set_number, eval_tuple in enumerate(eval_set):
-                    indexes_for_eval_tuple = index_of_eval_graphs_for_each_anchor_label[eval_set_number][i]
-                    eval_sets_for_each_anchor_label[i][eval_set_number] = (
-                        [eval_tuple[0][index] for index in indexes_for_eval_tuple],
-                        [eval_tuple[1][index] for index in indexes_for_eval_tuple])
-                    if len(eval_sets_for_each_anchor_label[i][eval_set_number][0]) == 0:
-                        eval_sets_for_each_anchor_label[i][eval_set_number] = None
-                    if len(train_dataset) == 0 and (eval_sets_for_each_anchor_label[i][eval_set_number] is not None):
-                        warnings.warn(
-                            f"Train dataset for anchor label {self.list_anchor_nodes_labels_[i]} is empty, but eval set is not empty. This portion of the eval set will be ignored.")
-            # -------------------------------------------------------------------------------------------------------
-
         # parallelization
         # We will use the `wbu.train_pattern_boosting` function to train the model in parallel.
         input_for_parallelization = list(zip(self.models_list_, train_datasets_for_each_anchor_label,
-                                             train_labels_for_each_anchor_label, eval_sets_for_each_anchor_label,
+                                             train_labels_for_each_anchor_label,
                                              self.list_anchor_nodes_labels_,
                                              [anchor_nodes_label_name for _ in
                                               range(len(self.list_anchor_nodes_labels_))]))
@@ -207,6 +172,8 @@ class PathBoost(BaseEstimator):
                 path_boosting_models = pool.map(wbu.train_pattern_boosting, input_for_parallelization)
 
         self.models_list_ = path_boosting_models
+        self.train_mse_ = self._compute_train_mse(
+            number_of_observations_for_each_model=[len(dataset) for dataset in train_datasets_for_each_anchor_label])
 
         if eval_set is not None:
             self.mse_eval_set_ = []
@@ -215,6 +182,14 @@ class PathBoost(BaseEstimator):
 
         # `fit` should always return `self`
         return self
+
+    def _compute_train_mse(self, number_of_observations_for_each_model: list[int]):
+        train_mse = np.zeros(self.n_iter)
+        for i, smc_model in enumerate(self.models_list_):
+            if smc_model is not None:
+                train_mse += np.array(smc_model.train_mse_) * number_of_observations_for_each_model[i]
+        train_mse = train_mse / sum(number_of_observations_for_each_model)
+        return train_mse
 
     def predict(self, X: list[nx.Graph]):
         """A reference implementation of a predicting function.
@@ -281,7 +256,7 @@ class PathBoost(BaseEstimator):
             map(list, itertools.zip_longest(*predictions_for_each_anchor_node_padded_with_none, fillvalue=None)))
 
         # Calculate the average of each row, ignoring None values
-        #predictions = [np.mean([x for x in sublist if x is not None]) for sublist in transposed_list]
+        # predictions = [np.mean([x for x in sublist if x is not None]) for sublist in transposed_list]
         predictions = []
         for sublist in transposed_list:
             if len(sublist) > 0:
@@ -294,8 +269,7 @@ class PathBoost(BaseEstimator):
                 avg = 0
             predictions.append(avg)
 
-
-        #predictions = [np.mean([x for x in sublist if x is not None]) if len(sublist) > 0 else 0 for sublist in transposed_list]
+        # predictions = [np.mean([x for x in sublist if x is not None]) if len(sublist) > 0 else 0 for sublist in transposed_list]
         predictions = [x if x is not None and not np.isnan(x) else 0 for x in predictions]
 
         return predictions
@@ -349,7 +323,8 @@ class PathBoost(BaseEstimator):
             step_by_step_predictions_for_each_anchor_node: list[list[list[numbers.Number]]] = []
             for i in range(len(datasets_for_each_anchor_label)):
                 if self.models_list_[i] is not None:
-                    predictions_step_by_step =  wbu.parallel_predict_step_by_step((self.models_list_[i], datasets_for_each_anchor_label[i]))
+                    predictions_step_by_step = wbu.parallel_predict_step_by_step(
+                        (self.models_list_[i], datasets_for_each_anchor_label[i]))
                     step_by_step_predictions_for_each_anchor_node.append(predictions_step_by_step)
                 else:
                     step_by_step_predictions_for_each_anchor_node.append(None)
@@ -392,15 +367,15 @@ class PathBoost(BaseEstimator):
             for sublist in transposed_iteration_predictions[iteration]:
                 if len(sublist) > 0:
                     non_none_values = [x for x in sublist if x is not None]
-                    if len(non_none_values)>0:
+                    if len(non_none_values) > 0:
                         avg = np.mean(non_none_values)
                     else:
                         avg = 0
                 else:
                     avg = 0
                 averages.append(avg)
-            #averages = [np.mean([x for x in sublist if x is not None]) if len(sublist) > 0 else 0 for sublist in transposed_iteration_predictions[iteration]]
-            averages = [x if x is not None and not np.isnan(x)  else 0 for x in averages]
+            # averages = [np.mean([x for x in sublist if x is not None]) if len(sublist) > 0 else 0 for sublist in transposed_iteration_predictions[iteration]]
+            averages = [x if x is not None and not np.isnan(x) else 0 for x in averages]
             predictions_step_by_step.append(averages)
 
         return predictions_step_by_step
@@ -442,23 +417,28 @@ class PathBoost(BaseEstimator):
         """
         # skip_the_first n iterations
         n = int(2 / self.learning_rate)
-        train_mse = self.train_mse_[n:]
+        if len(self.train_mse_) > n:
+            train_mse = self.train_mse_[n:]
+        else:
+            train_mse = self.train_mse_
 
         plt.figure(figsize=(12, 6))
 
         # Plot training errors
-        plt.plot(range(n, len(train_mse) + n), train_mse, label='Training Error', marker='o')
+        plt.plot(range(n, len(train_mse) + n), train_mse, label='Training Error', marker='.')
 
         # Plot evaluation set errors if available
-        if hasattr(self, 'eval_sets_mse_'):
-            eval_sets_mse = self.eval_sets_mse_[n:]
-            num_iterations = len(eval_sets_mse)
-            num_eval_sets = len(eval_sets_mse[0])
+        if hasattr(self, 'mse_eval_set_'):
+            if len(self.mse_eval_set_[0]) > n:
+                eval_set_mse = [self.mse_eval_set_[i][n:] for i in range(len(self.mse_eval_set_))]
+            else:
+                eval_set_mse = self.mse_eval_set_
+
+            num_iterations = len(eval_set_mse[0])
+            num_eval_sets = len(eval_set_mse)
             for eval_set_index in range(num_eval_sets):
-                if eval_sets_mse[0][eval_set_index] is not None:
-                    eval_set_errors = [eval_sets_mse[iteration][eval_set_index] for iteration in
-                                       range(num_iterations)]
-                    plt.plot(range(n, num_iterations + n), eval_set_errors,
+                if eval_set_mse[eval_set_index][0] is not None:
+                    plt.plot(range(n, num_iterations + n), eval_set_mse[eval_set_index],
                              label=f'Evaluation Set {eval_set_index + 1} Error', marker='.')
 
         plt.xlabel('Iteration')
