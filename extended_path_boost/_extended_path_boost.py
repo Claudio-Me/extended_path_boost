@@ -23,12 +23,14 @@ import multiprocessing as mp
 import networkx as nx
 import matplotlib.pyplot as plt
 
+from .utils.classes.single_metal_center_path_boost import SingleMetalCenterPathBoost
+from .utils import wrapper_path_boost_utils as wbu
+from .utils.classes.interfaces.interface_base_learner import BaseLearnerClassInterface
+from .utils.classes.interfaces.interface_selector import SelectorClassInterface
 from typing import Iterable
 from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin, _fit_context
 from sklearn.metrics import mean_squared_error
 from sklearn.utils.validation import check_is_fitted
-from .utils.classes.single_metal_center_path_boost import SingleMetalCenterPathBoost
-from .utils import wrapper_path_boost_utils as wbu
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.base import RegressorMixin
 from matplotlib.ticker import MaxNLocator
@@ -91,11 +93,9 @@ class PathBoost(BaseEstimator, RegressorMixin):
         self.n_of_cores = n_of_cores
 
         # very basic logic in the __init__ it is just to have a more clean code, it set kwargs with default dictionaries if no other input is given, it is possible to move the dictionaries as default parameters
-        self.kwargs_for_base_learner = kwargs_for_base_learner or {'max_depth': 3, 'random_state': 0,
-                                                                   'splitter': 'best', 'criterion': "squared_error"}
+        self.kwargs_for_base_learner = kwargs_for_base_learner
         self.SelectorClass = SelectorClass
-        self.kwargs_for_selector = kwargs_for_selector or {'max_depth': 1, 'random_state': 0, 'splitter': 'best',
-                                                           'criterion': "squared_error"}
+        self.kwargs_for_selector = kwargs_for_selector
 
     @_fit_context(prefer_skip_nested_validation=True)
     def fit(self, X: list[nx.Graph], y: Iterable, anchor_nodes_label_name: str, list_anchor_nodes_labels: list[tuple],
@@ -114,6 +114,12 @@ class PathBoost(BaseEstimator, RegressorMixin):
         self : object
             Returns self.
         """
+
+        self._default_kwargs_for_base_learner = {'max_depth': 3, 'random_state': 0,
+                                                 'splitter': 'best', 'criterion': "squared_error"}
+
+        self._default_kwargs_for_selector = {'max_depth': 1, 'random_state': 0, 'splitter': 'best',
+                                             'criterion': "squared_error"}
 
         X, y = self._validate_data(X, y, list_anchor_nodes_labels=list_anchor_nodes_labels, eval_set=eval_set)
 
@@ -142,11 +148,15 @@ class PathBoost(BaseEstimator, RegressorMixin):
             train_labels_for_each_anchor_label.append(train_labels)
             if len(train_dataset) != 0:
                 self.models_list_.append(
-                    SingleMetalCenterPathBoost(n_iter=self.n_iter, max_path_length=self.max_path_length,
-                                               learning_rate=self.learning_rate, BaseLearnerClass=self.BaseLearnerClass,
+                    SingleMetalCenterPathBoost(n_iter=self.n_iter,
+                                               max_path_length=self.max_path_length,
+                                               learning_rate=self.learning_rate,
+                                               BaseLearnerClass=self.BaseLearnerClass,
                                                SelectorClass=self.SelectorClass,
                                                kwargs_for_base_learner=self.kwargs_for_base_learner,
-                                               kwargs_for_selector=self.kwargs_for_selector, verbose=self.verbose))
+                                               kwargs_for_selector=self.kwargs_for_selector, verbose=self.verbose)
+                )
+
             else:
                 # if there is no training data, we will append None to the list of models
                 self.models_list_.append(None)
@@ -470,6 +480,30 @@ class PathBoost(BaseEstimator, RegressorMixin):
             assert isinstance(X, list) and all(isinstance(item, nx.Graph) for item in X)
         if not np.array_equal(y, "no_validation"):
             assert isinstance(y, Iterable) and all(isinstance(item, numbers.Number) for item in y)
+
+        # check BaseLearnerClass and SelectorClass respects the respective interfaces
+        if not issubclass(self.BaseLearnerClass, BaseLearnerClassInterface):
+            raise TypeError(f"{self.BaseLearnerClass.__name__} must implement BaseLearnerClassInterface")
+
+        if not issubclass(self.SelectorClass, SelectorClassInterface):
+            raise TypeError(f"{self.SelectorClass.__name__} must implement BaseLearnerClassInterface")
+
+
+        if issubclass(self.BaseLearnerClass, DecisionTreeRegressor):
+            if self.kwargs_for_base_learner is None:
+                self.kwargs_for_base_learner = self._default_kwargs_for_base_learner
+            else:
+                for key in self._default_kwargs_for_base_learner:
+                    if key not in self.kwargs_for_base_learner:
+                        self.kwargs_for_base_learner[key] = self._default_kwargs_for_base_learner[key]
+
+        if issubclass(self.SelectorClass, DecisionTreeRegressor):
+            if self.kwargs_for_selector is None:
+                self.kwargs_for_selector = self._default_kwargs_for_selector
+            else:
+                for key in self._default_kwargs_for_selector:
+                    if key not in self.kwargs_for_selector:
+                        self.kwargs_for_selector[key] = self._default_kwargs_for_selector[key]
 
         # check list_anchor_nodes_labels
         list_anchor_nodes_labels = check_params.get('list_anchor_nodes_labels', None)

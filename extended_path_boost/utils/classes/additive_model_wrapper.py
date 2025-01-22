@@ -1,19 +1,22 @@
-import matplotlib.pyplot as plt
 import pandas as pd
-import warnings
-from sklearn.metrics import mean_squared_error
+import copy
 import numpy as np
+import warnings
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error
 from .extended_boosting_matrix import ExtendedBoostingMatrix
 from typing import Iterable
-import copy
-from sklearn import tree
-import matplotlib.pyplot as plt
+from .interfaces.interface_base_learner import BaseLearnerClassInterface
 
 
 class AdditiveModelWrapper:
     def __init__(self, BaseModelClass, base_model_class_kwargs, learning_rate: float, ):
         # model class will have an interface
         # TODO add the interface
+
+        # Ensure BaseModelClass respects BaseLearnerClassInterface
+        if not issubclass(BaseModelClass, BaseLearnerClassInterface):
+            raise TypeError(f"{BaseModelClass.__name__} must implement BaseLearnerClassInterface")
 
         self._last_train_prediction: pd.Series | None = None
 
@@ -25,12 +28,14 @@ class AdditiveModelWrapper:
         self.BaseModelClass = BaseModelClass
         self.base_model_class_kwargs = base_model_class_kwargs
 
+
     def fit_one_step(self, X: pd.DataFrame, y, best_path, eval_set=None, negative_gradient=None):
         # it fits one step of the boosting
 
         columns_to_keep = ExtendedBoostingMatrix.get_columns_related_to_path(best_path, X.columns)
         restricted_df = X[columns_to_keep]
-        new_base_learner = self.BaseModelClass(**self.base_model_class_kwargs)
+        if self.base_model_class_kwargs is not None:
+            new_base_learner = self.BaseModelClass(**self.base_model_class_kwargs)
 
         self.trained_ = True
         if eval_set is not None and not hasattr(self, '_last_eval_set_prediction_'):

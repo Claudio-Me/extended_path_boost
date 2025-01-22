@@ -3,6 +3,11 @@ import pandas as pd
 import numbers
 import matplotlib.pyplot as plt
 import numpy as np
+
+from .interfaces.interface_base_learner import BaseLearnerClassInterface
+from .interfaces.interface_selector import SelectorClassInterface
+
+
 from sklearn.base import BaseEstimator
 from sklearn.base import RegressorMixin
 from .extended_boosting_matrix import ExtendedBoostingMatrix
@@ -24,11 +29,9 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
         self.BaseLearnerClass = BaseLearnerClass
         self.verbose = verbose
         # very basic logic in the __init__ it is just to have a more clean code, it set kwargs with default dictionaries if no other input is given, it is possible to move the dictionaries as default parameters
-        self.kwargs_for_base_learner = kwargs_for_base_learner or {'max_depth': 3, 'random_state': 0,
-                                                                   'splitter': 'best', 'criterion': "squared_error"}
+        self.kwargs_for_base_learner = kwargs_for_base_learner
         self.SelectorClass = SelectorClass
-        self.kwargs_for_selector = kwargs_for_selector or {'max_depth': 1, 'random_state': 0, 'splitter': 'best',
-                                                           'criterion': "squared_error"}
+        self.kwargs_for_selector = kwargs_for_selector
 
     def fit(self, X: list[nx.Graph], y: np.array, list_anchor_nodes_labels: list[tuple], name_of_label_attribute,
             eval_set: list[tuple[list[nx.Graph], Iterable]] = None):
@@ -60,6 +63,18 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
             None, the function assumes all preprocessing and validation steps have been
             handled externally.
         """
+
+        self._default_kwargs_for_base_learner = {'max_depth': 3,
+                                                 'random_state': 0,
+                                                 'splitter': 'best',
+                                                 'criterion': "squared_error"
+                                                 }
+
+        self._default_kwargs_for_selector = {'max_depth': 1,
+                                             'random_state': 0,
+                                             'splitter': 'best',
+                                             'criterion': "squared_error"
+                                             }
 
         self._validate_data(X=X, y=y, list_anchor_nodes_labels=list_anchor_nodes_labels,
                             name_of_label_attribute=name_of_label_attribute, eval_set=eval_set)
@@ -237,6 +252,26 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
             raise ValueError("X is not provided")
         if isinstance(y, str) and y == "no_validation":
             raise ValueError("y is not provided")
+
+        # check BaseLearnerClass and SelectorClass
+        assert issubclass(self.BaseLearnerClass, BaseLearnerClassInterface)
+        assert issubclass(self.SelectorClass, SelectorClassInterface)
+
+        if issubclass(self.BaseLearnerClass, DecisionTreeRegressor):
+            if self.kwargs_for_base_learner is None:
+                self.kwargs_for_base_learner = self._default_kwargs_for_base_learner
+            else:
+                for key in self._default_kwargs_for_base_learner:
+                    if key not in self.kwargs_for_base_learner:
+                        self.kwargs_for_base_learner[key] = self._default_kwargs_for_base_learner[key]
+
+        if issubclass(self.SelectorClass, DecisionTreeRegressor):
+            if self.kwargs_for_selector is None:
+                self.kwargs_for_selector = self._default_kwargs_for_selector
+            else:
+                for key in self._default_kwargs_for_selector:
+                    if key not in self.kwargs_for_selector:
+                        self.kwargs_for_selector[key] = self._default_kwargs_for_selector[key]
 
         list_anchor_nodes_labels = check_params.get('list_anchor_nodes_labels', None)
         if list_anchor_nodes_labels is not None:
