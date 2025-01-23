@@ -462,6 +462,16 @@ class PathBoost(BaseEstimator, RegressorMixin):
 
         plt.show()
 
+    def score(self, X, y, sample_weight=None):
+        # This method is used to evaluate the model on the given data.
+        # It is defined in the `RegressorMixin` class.
+        # It allows to:
+        # - evaluate the model on the given data
+        # - return the score
+        mse_evolution = self.evaluate(X=X, y=y)
+        best_mse = max(mse_evolution)
+        return best_mse
+
     def _validate_data(
             self,
             X="no_validation",
@@ -487,7 +497,6 @@ class PathBoost(BaseEstimator, RegressorMixin):
 
         if not issubclass(self.SelectorClass, SelectorClassInterface):
             raise TypeError(f"{self.SelectorClass.__name__} must implement BaseLearnerClassInterface")
-
 
         if issubclass(self.BaseLearnerClass, DecisionTreeRegressor):
             if self.kwargs_for_base_learner is None:
