@@ -1,3 +1,6 @@
+import sys
+sys.path.append('/path/to/mypackage')
+
 from extended_path_boost._extended_path_boost import PathBoost
 
 import os
