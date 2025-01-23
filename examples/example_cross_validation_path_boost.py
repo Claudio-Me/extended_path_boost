@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/path/to/mypackage')
+sys.path.append('/mn/sarpanitu/ansatte-u6/claudm/PycharmProjects/extended_path_boost/')
 
 from extended_path_boost._extended_path_boost import PathBoost
 
@@ -14,25 +14,25 @@ from extended_path_boost.tests.test_datasets.load_test_dataset import get_nx_tes
 
 if __name__ == "__main__":
     # Load the dataset
-    # nx_graphs , y = get_full_nx_dataset_with_y()
+    nx_graphs , y = get_full_nx_dataset_with_y()
     # Load the dataset
-    nx_graphs = get_nx_test_dataset()
-    y = get_y()
+    #nx_graphs = get_nx_test_dataset()
+    #y = get_y()
     # Split the dataset into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(nx_graphs, y, test_size=0.2, random_state=42)
 
     # Define the parameter grid
     param_grid = {
-        'learning_rate': [0.01, 0.02, 0.05],
-        'max_path_length': [3, 5, 7],
-        'kwargs_for_base_learner': [{'max_depth': 3}, {'max_depth': 4}]
+        'learning_rate': [0.01, 0.8],
+        'max_path_length': [3],
+        'kwargs_for_base_learner': [{'max_depth': 3}]
     }
 
     # Initialize the PathBoost model
-    path_boost = PathBoost(n_iter=5000, n_of_cores=14, verbose=False)
+    path_boost = PathBoost(n_iter=5, n_of_cores=11, verbose=False)
 
     # Initialize GridSearchCV
-    grid_search = GridSearchCV(estimator=path_boost, param_grid=param_grid, cv=3, scoring='neg_mean_squared_error',
+    grid_search = GridSearchCV(estimator=path_boost, param_grid=param_grid, cv=2, scoring='neg_mean_squared_error',
                                verbose=3)
 
     list_anchor_nodes_labels = [21, 22, 23, 24, 25, 26, 27, 28, 29, 30,  # first block
