@@ -30,7 +30,7 @@ from .utils.classes.interfaces.interface_selector import SelectorClassInterface
 from typing import Iterable
 from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin, _fit_context
 from sklearn.metrics import mean_squared_error
-from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import check_is_fitted, validate_data
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.base import RegressorMixin
 from matplotlib.ticker import MaxNLocator
@@ -470,7 +470,7 @@ class PathBoost(BaseEstimator, RegressorMixin):
         # - return the score
         mse_evolution = self.evaluate(X=X, y=y)
         best_mse = max(mse_evolution)
-        return best_mse
+        return - best_mse
 
     def _validate_data(
             self,
@@ -478,7 +478,6 @@ class PathBoost(BaseEstimator, RegressorMixin):
             y="no_validation",
             reset=True,
             validate_separately=False,
-            cast_to_ndarray=True,
             **check_params,
     ):
 
@@ -538,12 +537,11 @@ class PathBoost(BaseEstimator, RegressorMixin):
                     isinstance(item, numbers.Number) for item in eval_tuple[1])
 
         if not np.array_equal(y, "no_validation"):
-            super()._validate_data(
+            validate_data(self,
                 X="no_validation",
                 y=y,
                 reset=reset,
-                validate_separately=validate_separately,
-                cast_to_ndarray=cast_to_ndarray,
+                validate_separately=validate_separately
             )
 
         if not np.array_equal(X, "no_validation") and not np.array_equal(y, "no_validation"):

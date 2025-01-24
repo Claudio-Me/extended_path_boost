@@ -14,10 +14,10 @@ from extended_path_boost.tests.test_datasets.load_test_dataset import get_nx_tes
 
 if __name__ == "__main__":
     # Load the dataset
-    nx_graphs , y = get_full_nx_dataset_with_y()
+    #nx_graphs , y = get_full_nx_dataset_with_y()
     # Load the dataset
-    #nx_graphs = get_nx_test_dataset()
-    #y = get_y()
+    nx_graphs = get_nx_test_dataset()
+    y = get_y()
     # Split the dataset into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(nx_graphs, y, test_size=0.2, random_state=42)
 
@@ -31,8 +31,10 @@ if __name__ == "__main__":
     # Initialize the PathBoost model
     path_boost = PathBoost(n_iter=5, n_of_cores=11, verbose=False)
 
+    score = 'neg_mean_squared_error'
+    score = None
     # Initialize GridSearchCV
-    grid_search = GridSearchCV(estimator=path_boost, param_grid=param_grid, cv=2, scoring='neg_mean_squared_error',
+    grid_search = GridSearchCV(estimator=path_boost, param_grid=param_grid, cv=2, scoring=score,
                                verbose=3)
 
     list_anchor_nodes_labels = [21, 22, 23, 24, 25, 26, 27, 28, 29, 30,  # first block
@@ -41,6 +43,8 @@ if __name__ == "__main__":
                                 72, 73, 74, 75, 76, 77, 78, 79, 80,  # third block
                                 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103,  # actinides
                                 104, 105, 106, 107, 108, 109, 110, 111, 112]
+
+    list_anchor_nodes_labels = [25, 47, 48, 80]
 
     # Fit the model on the training data
     grid_search.fit(X_train, y_train, list_anchor_nodes_labels=list_anchor_nodes_labels,
