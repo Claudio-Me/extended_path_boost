@@ -1,4 +1,4 @@
-extended_path_boost"""
+"""
 =============================
 Plotting Template Transformer
 =============================

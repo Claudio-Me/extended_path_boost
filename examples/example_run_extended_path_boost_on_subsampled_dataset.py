@@ -2,6 +2,7 @@ from extended_path_boost._extended_path_boost import PathBoost
 from extended_path_boost.tests.test_datasets.load_test_dataset import get_nx_test_dataset, get_y
 from sklearn.model_selection import train_test_split
 
+
 if __name__ == "__main__":
     # Load the dataset
     nx_graphs = get_nx_test_dataset()

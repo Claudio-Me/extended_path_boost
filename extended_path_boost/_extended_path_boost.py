@@ -27,6 +27,7 @@ from .utils.classes.single_metal_center_path_boost import SingleMetalCenterPathB
 from .utils import wrapper_path_boost_utils as wbu
 from .utils.classes.interfaces.interface_base_learner import BaseLearnerClassInterface
 from .utils.classes.interfaces.interface_selector import SelectorClassInterface
+from .utils.validate_data import util_validate_data
 from typing import Iterable
 from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin, _fit_context
 from sklearn.metrics import mean_squared_error
@@ -80,22 +81,23 @@ class PathBoost(BaseEstimator, RegressorMixin):
         "n_of_cores": [int],
     }
 
-    def __init__(self, n_iter=100, max_path_length=10, learning_rate=0.1, BaseLearnerClass=DecisionTreeRegressor,
+    def __init__(self, n_iter=100, max_path_length=10, learning_rate=0.1, m_stops: list[int] = None,
+                 BaseLearnerClass=DecisionTreeRegressor,
                  kwargs_for_base_learner=None, SelectorClass=DecisionTreeRegressor, kwargs_for_selector=None,
+                 replace_nan_with=np.nan,
                  verbose: bool = False, n_of_cores: int = 1):
-        if kwargs_for_base_learner is None:
-            kwargs_for_base_learner = {}
-        self.n_iter = n_iter
-        self.max_path_length = max_path_length
-        self.learning_rate = learning_rate
-        self.BaseLearnerClass = BaseLearnerClass
-        self.verbose = verbose
-        self.n_of_cores = n_of_cores
 
-        # very basic logic in the __init__ it is just to have a more clean code, it set kwargs with default dictionaries if no other input is given, it is possible to move the dictionaries as default parameters
-        self.kwargs_for_base_learner = kwargs_for_base_learner
-        self.SelectorClass = SelectorClass
-        self.kwargs_for_selector = kwargs_for_selector
+        self.n_iter: int = n_iter
+        self.m_stops: list[int] = m_stops
+        self.max_path_length: int = max_path_length
+        self.learning_rate: float = learning_rate
+        self.BaseLearnerClass: type[BaseLearnerClassInterface] = BaseLearnerClass
+        self.verbose: bool = verbose
+        self.n_of_cores = n_of_cores
+        self.kwargs_for_base_learner: dict = kwargs_for_base_learner
+        self.SelectorClass: type[SelectorClassInterface] = SelectorClass
+        self.kwargs_for_selector: dict = kwargs_for_selector
+        self.replace_nan_with = replace_nan_with
 
     @_fit_context(prefer_skip_nested_validation=True)
     def fit(self, X: list[nx.Graph], y: Iterable, anchor_nodes_label_name: str, list_anchor_nodes_labels: list[tuple],
@@ -121,10 +123,11 @@ class PathBoost(BaseEstimator, RegressorMixin):
         self._default_kwargs_for_selector = {'max_depth': 1, 'random_state': 0, 'splitter': 'best',
                                              'criterion': "squared_error"}
 
-        X, y = self._validate_data(X, y, list_anchor_nodes_labels=list_anchor_nodes_labels, eval_set=eval_set)
-
         self.anchor_nodes_label_name_ = anchor_nodes_label_name
         self.list_anchor_nodes_labels_ = list_anchor_nodes_labels
+
+        X, y = self._validate_data(X, y, list_anchor_nodes_labels=list_anchor_nodes_labels, eval_set=eval_set,
+                                   m_stops=self.m_stops)
 
         self.is_fitted_ = True
 
@@ -154,7 +157,9 @@ class PathBoost(BaseEstimator, RegressorMixin):
                                                BaseLearnerClass=self.BaseLearnerClass,
                                                SelectorClass=self.SelectorClass,
                                                kwargs_for_base_learner=self.kwargs_for_base_learner,
-                                               kwargs_for_selector=self.kwargs_for_selector, verbose=self.verbose)
+                                               kwargs_for_selector=self.kwargs_for_selector,
+                                               replace_nan_with=self.replace_nan_with,
+                                               verbose=self.verbose)
                 )
 
             else:
@@ -469,7 +474,8 @@ class PathBoost(BaseEstimator, RegressorMixin):
         # - evaluate the model on the given data
         # - return the score
         mse_evolution = self.evaluate(X=X, y=y)
-        best_mse = max(mse_evolution)
+        # best_mse = min(mse_evolution)
+        best_mse = mse_evolution[-1]
         return - best_mse
 
     def _validate_data(
@@ -481,68 +487,21 @@ class PathBoost(BaseEstimator, RegressorMixin):
             **check_params,
     ):
 
-        # We use the `_validate_data` method to validate the input data.
-        # This method is defined in the `BaseEstimator` class.
-        # It allows to:
-        # - run different checks on the input data
-        if not np.array_equal(X, "no_validation"):
-            assert isinstance(X, list) and all(isinstance(item, nx.Graph) for item in X)
-        if not np.array_equal(y, "no_validation"):
-            assert isinstance(y, Iterable) and all(isinstance(item, numbers.Number) for item in y)
+        util_validate_data(model=self, X=X, y=y, reset=reset, validate_separately=validate_separately, **check_params)
 
-        # check BaseLearnerClass and SelectorClass respects the respective interfaces
-        if not issubclass(self.BaseLearnerClass, BaseLearnerClassInterface):
-            raise TypeError(f"{self.BaseLearnerClass.__name__} must implement BaseLearnerClassInterface")
-
-        if not issubclass(self.SelectorClass, SelectorClassInterface):
-            raise TypeError(f"{self.SelectorClass.__name__} must implement BaseLearnerClassInterface")
-
-        if issubclass(self.BaseLearnerClass, DecisionTreeRegressor):
-            if self.kwargs_for_base_learner is None:
-                self.kwargs_for_base_learner = self._default_kwargs_for_base_learner
-            else:
-                for key in self._default_kwargs_for_base_learner:
-                    if key not in self.kwargs_for_base_learner:
-                        self.kwargs_for_base_learner[key] = self._default_kwargs_for_base_learner[key]
-
-        if issubclass(self.SelectorClass, DecisionTreeRegressor):
-            if self.kwargs_for_selector is None:
-                self.kwargs_for_selector = self._default_kwargs_for_selector
-            else:
-                for key in self._default_kwargs_for_selector:
-                    if key not in self.kwargs_for_selector:
-                        self.kwargs_for_selector[key] = self._default_kwargs_for_selector[key]
-
-        # check list_anchor_nodes_labels
-        list_anchor_nodes_labels = check_params.get('list_anchor_nodes_labels', None)
-        if list_anchor_nodes_labels is not None:
-            # Ensure each element in list_anchor_nodes_labels is a tuple
-            len_list_anchor_nodes_labels = len(list_anchor_nodes_labels)
-            for i in range(len_list_anchor_nodes_labels):
-                if not isinstance(list_anchor_nodes_labels[i], tuple):
-                    if hasattr(list_anchor_nodes_labels[i], '__iter__') and not isinstance(list_anchor_nodes_labels[i],
-                                                                                           str):
-                        list_anchor_nodes_labels[i] = tuple(list_anchor_nodes_labels[i])
-                    else:
-                        list_anchor_nodes_labels[i] = tuple([list_anchor_nodes_labels[i]])
-
-        # check eval sets
-        eval_set = check_params.get('eval_set', None)
-        if eval_set is not None:
-            assert isinstance(eval_set, Iterable) and all(
-                isinstance(eval_tuple, tuple) and len(eval_tuple) == 2 for eval_tuple in eval_set)
-            for eval_tuple in eval_set:
-                assert isinstance(eval_tuple[0], list) and all(isinstance(item, nx.Graph) for item in eval_tuple[0])
-                assert isinstance(eval_tuple[1], Iterable) and all(
-                    isinstance(item, numbers.Number) for item in eval_tuple[1])
+        # check m_stops
+        m_stops = check_params.get('m_stops', None)
+        if m_stops is not None:
+            assert isinstance(m_stops, list) and all(isinstance(item, (int, type(None))) for item in m_stops)
+            assert len(m_stops) == len(self.list_anchor_nodes_labels)
 
         if not np.array_equal(y, "no_validation"):
             validate_data(self,
-                X="no_validation",
-                y=y,
-                reset=reset,
-                validate_separately=validate_separately
-            )
+                          X="no_validation",
+                          y=y,
+                          reset=reset,
+                          validate_separately=validate_separately
+                          )
 
         if not np.array_equal(X, "no_validation") and not np.array_equal(y, "no_validation"):
             return X, y

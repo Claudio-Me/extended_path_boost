@@ -23,7 +23,8 @@ class ExtendedBoostingMatrix:
     @staticmethod
     def generate_new_columns_from_columns_names(dataset: list[nx.Graph], columns_names: Iterable[str],
                                                 main_label_name: str,
-                                                ebm_to_be_expanded: pd.DataFrame | None = None) -> pd.DataFrame:
+                                                ebm_to_be_expanded: pd.DataFrame | None = None,
+                                                replace_nan_with=np.nan) -> pd.DataFrame:
         new_columns = None
 
         # find paths names in column_names
@@ -46,7 +47,8 @@ class ExtendedBoostingMatrix:
             expanded_columns = ExtendedBoostingMatrix.generate_new_columns_from_path_labels(dataset=dataset,
                                                                                             path_labels=path_labels,
                                                                                             main_label_name=main_label_name,
-                                                                                            frequency_column=frequency_column)
+                                                                                            frequency_column=frequency_column,
+                                                                                            replace_nan_with=replace_nan_with)
 
             filtered_columns_names = [col for col in columns_names_referring_to_path if col in expanded_columns.columns]
             expanded_columns = expanded_columns[filtered_columns_names]
@@ -66,7 +68,7 @@ class ExtendedBoostingMatrix:
     @staticmethod
     def generate_new_columns_from_path_labels(dataset: list[nx.Graph],
                                               path_labels: list, main_label_name: str,
-                                              frequency_column, ) -> pd.DataFrame:
+                                              frequency_column, replace_nan_with=np.nan) -> pd.DataFrame:
         # given a list that reppresent the labels of a path it returns the new columns for this path
         if frequency_column is None:
             frequency_column = [1] * len(dataset)
@@ -97,17 +99,17 @@ class ExtendedBoostingMatrix:
                 columns_for_dataframe[frequency_column_name][graph_number] = len(paths_found)
 
         new_df_columns = pd.DataFrame(columns_for_dataframe)
-        new_df_columns = ExtendedBoostingMatrix._remove_empty_list_values_from_df(new_df_columns)
-
-
+        new_df_columns = ExtendedBoostingMatrix._remove_empty_list_values_from_df(new_df_columns,
+                                                                                  default_value=replace_nan_with)
 
         return new_df_columns
 
     @staticmethod
     def new_columns_to_expand_ebm_dataframe_with_path(dataset: list[nx.Graph], selected_path: list | tuple,
                                                       main_label_name: str,
-                                                      df_to_be_expanded: pd.DataFrame) -> pd.DataFrame:
-        # this fucntion returns the new columns that should be added to the dataframe to expand it. The new columns come from the paths that expands selected path
+                                                      df_to_be_expanded: pd.DataFrame,
+                                                      replace_nan_with=np.nan) -> pd.DataFrame:
+        # this function returns the new columns that should be added to the dataframe to expand it. The new columns come from the paths that expands selected path
         # find frequency column relative to the selected path
         path_frequency_column_name = \
             ExtendedBoostingMatrix.generate_name_of_columns_for(selected_path,
@@ -168,7 +170,8 @@ class ExtendedBoostingMatrix:
                 columns_for_dataframe[key][graph_number] = value
 
         new_df_columns = pd.DataFrame(columns_for_dataframe)
-        new_df_columns = ExtendedBoostingMatrix._remove_empty_list_values_from_df(new_df_columns)
+        new_df_columns = ExtendedBoostingMatrix._remove_empty_list_values_from_df(new_df_columns,
+                                                                                  default_value=replace_nan_with)
         return new_df_columns
 
     @staticmethod
@@ -331,7 +334,8 @@ class ExtendedBoostingMatrix:
     @staticmethod
     def initialize_boosting_matrix_with_anchor_nodes_attributes(dataset: list[nx.Graph],
                                                                 list_anchor_nodes_labels: list,
-                                                                id_label_name: str, ) -> pd.DataFrame:
+                                                                id_label_name: str,
+                                                                replace_nan_with=np.nan) -> pd.DataFrame:
 
         extended_boosting_matrix_df = None
         for anchor_node_label in list_anchor_nodes_labels:
@@ -343,25 +347,27 @@ class ExtendedBoostingMatrix:
             columns_for_anchor_node = ExtendedBoostingMatrix.generate_new_columns_from_path_labels(dataset=dataset,
                                                                                                    path_labels=anchor_node_label_as_tuple,
                                                                                                    frequency_column=None,
-                                                                                                   main_label_name=id_label_name)
+                                                                                                   main_label_name=id_label_name,
+                                                                                                   replace_nan_with=replace_nan_with)
             if extended_boosting_matrix_df is None:
                 extended_boosting_matrix_df = columns_for_anchor_node
             else:
                 extended_boosting_matrix_df = pd.concat([extended_boosting_matrix_df, columns_for_anchor_node], axis=1)
 
-        extended_boosting_matrix_df = ExtendedBoostingMatrix._remove_empty_list_values_from_df(extended_boosting_matrix_df)
-
-
+        extended_boosting_matrix_df = ExtendedBoostingMatrix._remove_empty_list_values_from_df(
+            extended_boosting_matrix_df, default_value=replace_nan_with)
 
         return extended_boosting_matrix_df
 
     @staticmethod
-    def _remove_empty_list_values_from_df(df: pd.DataFrame) -> pd.DataFrame:
-        modified_df=df.map(lambda x: np.nan if isinstance(x, list) and len(x) == 0 else x)
+    def _remove_empty_list_values_from_df(df: pd.DataFrame, default_value=np.nan) -> pd.DataFrame:
+        modified_df = df.map(lambda x: np.nan if isinstance(x, list) and len(x) == 0 else x)
         # the entries of the columns "(path)_n_times_present" are nan if the path is not present in the graph, we convert nan to 0
         columns_to_replace = [col for col in modified_df.columns if
                               ExtendedBoostingMatrix.frequency_column_name in col]
         modified_df[columns_to_replace] = modified_df[columns_to_replace].fillna(0).astype(int)
+        if default_value is not np.nan:
+            modified_df = modified_df.fillna(default_value)
         return modified_df
 
     @staticmethod

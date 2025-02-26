@@ -2,7 +2,7 @@ import networkx as nx
 import pandas as pd
 import pytest
 from extended_path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
-
+import numpy as np
 
 @pytest.fixture
 def sample_graph():
@@ -39,7 +39,8 @@ def test_new_columns_to_expand_ebm_dataframe_with_path(dataset_and_dataframe):
         dataset=dataset,
         selected_path=selected_path,
         df_to_be_expanded=df_to_be_expanded,
-        main_label_name=id_label_name
+        main_label_name=id_label_name,
+        replace_nan_with= np.nan
     )
 
     assert isinstance(new_columns, pd.DataFrame)
@@ -79,7 +80,8 @@ def test_new_columns_to_expand_ebm_dataframe_more_complicate_graph():
         dataset=dataset,
         selected_path=selected_path,
         df_to_be_expanded=df_to_be_expanded,
-        main_label_name=id_label_name
+        main_label_name=id_label_name,
+        replace_nan_with= np.nan
     )
 
     assert isinstance(new_columns, pd.DataFrame)

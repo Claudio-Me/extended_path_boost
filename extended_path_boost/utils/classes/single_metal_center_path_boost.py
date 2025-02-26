@@ -6,8 +6,7 @@ import numpy as np
 
 from .interfaces.interface_base_learner import BaseLearnerClassInterface
 from .interfaces.interface_selector import SelectorClassInterface
-
-
+from ..validate_data import util_validate_data
 from sklearn.base import BaseEstimator
 from sklearn.base import RegressorMixin
 from .extended_boosting_matrix import ExtendedBoostingMatrix
@@ -20,6 +19,7 @@ from matplotlib.ticker import MaxNLocator
 class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
     def __init__(self, n_iter=100, max_path_length=10, learning_rate=0.1, BaseLearnerClass=DecisionTreeRegressor,
                  kwargs_for_base_learner=None, SelectorClass=DecisionTreeRegressor, kwargs_for_selector=None,
+                 replace_nan_with=None,
                  verbose=False):
         if kwargs_for_base_learner is None:
             kwargs_for_base_learner = {}
@@ -28,6 +28,7 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
         self.learning_rate = learning_rate
         self.BaseLearnerClass = BaseLearnerClass
         self.verbose = verbose
+        self.replace_nan_with = replace_nan_with
         # very basic logic in the __init__ it is just to have a more clean code, it set kwargs with default dictionaries if no other input is given, it is possible to move the dictionaries as default parameters
         self.kwargs_for_base_learner = kwargs_for_base_learner
         self.SelectorClass = SelectorClass
@@ -139,7 +140,8 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
                     dataset=eval_set_dataset,
                     ebm_to_be_expanded=self.eval_set_ebm_df_and_target_[eval_set_number][0],
                     columns_names=missing_columns,
-                    main_label_name=main_label_name)
+                    main_label_name=main_label_name,
+                    replace_nan_with= self.replace_nan_with)
                 self.eval_set_ebm_df_and_target_[eval_set_number][0] = pd.concat(
                     [self.eval_set_ebm_df_and_target_[eval_set_number][0], new_columns_for_eval_set], axis=1)
 
@@ -155,7 +157,8 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
         columns_names = list(set(columns_names))
         ebm_dataframe = ExtendedBoostingMatrix.generate_new_columns_from_columns_names(dataset=dataset,
                                                                                        columns_names=columns_names,
-                                                                                       main_label_name=self.name_of_label_attribute_)
+                                                                                       main_label_name=self.name_of_label_attribute_,
+                                                                                       replace_nan_with= self.replace_nan_with)
 
         return ebm_dataframe
 
@@ -194,7 +197,8 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
             new_columns = ExtendedBoostingMatrix.new_columns_to_expand_ebm_dataframe_with_path(dataset=X,
                                                                                                selected_path=selected_path,
                                                                                                main_label_name=main_label_name,
-                                                                                               df_to_be_expanded=self.train_ebm_dataframe_)
+                                                                                               df_to_be_expanded=self.train_ebm_dataframe_,
+                                                                                               replace_nan_with= self.replace_nan_with)
             self.train_ebm_dataframe_ = pd.concat([self.train_ebm_dataframe_, new_columns], axis=1)
 
     def _initialize_path_boosting(self, X, list_anchor_nodes_labels: list, main_label_name: str,
@@ -206,7 +210,8 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
         self.train_ebm_dataframe_ = ExtendedBoostingMatrix.initialize_boosting_matrix_with_anchor_nodes_attributes(
             dataset=X,
             list_anchor_nodes_labels=list_anchor_nodes_labels,
-            id_label_name=main_label_name)
+            id_label_name=main_label_name,
+            replace_nan_with=self.replace_nan_with)
         self.eval_set_ebm_df_and_target_ = []
 
         # generate extended boosting matrix for eval dataset
@@ -223,7 +228,8 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
                     eval_set_ebm_dataframe = ExtendedBoostingMatrix.initialize_boosting_matrix_with_anchor_nodes_attributes(
                         dataset=eval_dataset,
                         list_anchor_nodes_labels=list_anchor_nodes_labels,
-                        id_label_name=main_label_name)
+                        id_label_name=main_label_name,
+                        replace_nan_with=self.replace_nan_with)
                     self.eval_set_ebm_df_and_target_.append([eval_set_ebm_dataframe, y_eval_set])
 
         # initialize base learner wrapper
@@ -248,42 +254,7 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
             **check_params,
     ):
 
-        if isinstance(X, str) and X == "no_validation":
-            raise ValueError("X is not provided")
-        if isinstance(y, str) and y == "no_validation":
-            raise ValueError("y is not provided")
-
-        # check BaseLearnerClass and SelectorClass
-        assert issubclass(self.BaseLearnerClass, BaseLearnerClassInterface)
-        assert issubclass(self.SelectorClass, SelectorClassInterface)
-
-        if issubclass(self.BaseLearnerClass, DecisionTreeRegressor):
-            if self.kwargs_for_base_learner is None:
-                self.kwargs_for_base_learner = self._default_kwargs_for_base_learner
-            else:
-                for key in self._default_kwargs_for_base_learner:
-                    if key not in self.kwargs_for_base_learner:
-                        self.kwargs_for_base_learner[key] = self._default_kwargs_for_base_learner[key]
-
-        if issubclass(self.SelectorClass, DecisionTreeRegressor):
-            if self.kwargs_for_selector is None:
-                self.kwargs_for_selector = self._default_kwargs_for_selector
-            else:
-                for key in self._default_kwargs_for_selector:
-                    if key not in self.kwargs_for_selector:
-                        self.kwargs_for_selector[key] = self._default_kwargs_for_selector[key]
-
-        list_anchor_nodes_labels = check_params.get('list_anchor_nodes_labels', None)
-        if list_anchor_nodes_labels is not None:
-            # Ensure each element in list_anchor_nodes_labels is a tuple
-            len_list_anchor_nodes_labels = len(list_anchor_nodes_labels)
-            for i in range(len_list_anchor_nodes_labels):
-                if not isinstance(list_anchor_nodes_labels[i], tuple):
-                    if hasattr(list_anchor_nodes_labels[i], '__iter__') and not isinstance(list_anchor_nodes_labels[i],
-                                                                                           str):
-                        list_anchor_nodes_labels[i] = tuple(list_anchor_nodes_labels[i])
-                    else:
-                        list_anchor_nodes_labels[i] = tuple([list_anchor_nodes_labels[i]])
+        util_validate_data(model=self, X=X, y=y, **check_params)
 
     def plot_training_and_eval_errors(self):
         """

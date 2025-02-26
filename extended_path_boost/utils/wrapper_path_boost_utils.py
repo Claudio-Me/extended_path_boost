@@ -35,8 +35,7 @@ def split_dataset_by_metal_centers(graphs_list: list[nx.Graph], anchor_nodes_lab
     return indices_list
 
 
-
-def train_pattern_boosting(input_from_parallelization: tuple):
+def train_pattern_boosting(input_from_parallelization: tuple) -> SingleMetalCenterPathBoost | None:
     model: SingleMetalCenterPathBoost = input_from_parallelization[0]
     if model is None:
         return None
@@ -56,6 +55,7 @@ def parallel_predict(input_from_parallelization: tuple):
         return None
 
     return model.predict(X)
+
 
 def parallel_predict_step_by_step(input_from_parallelization: tuple):
     model: SingleMetalCenterPathBoost = input_from_parallelization[0]

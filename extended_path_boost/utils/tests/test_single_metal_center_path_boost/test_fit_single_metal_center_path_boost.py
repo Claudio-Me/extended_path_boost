@@ -204,7 +204,8 @@ def test_single_metal_center_path_boost_fit_cop():
     assert len(booster.train_mse_) == 20
 
     # Check if the evaluation MSE is recorded
-    assert len(booster.eval_sets_mse_) == 20
+    assert len(booster.eval_sets_mse_) == 2
+    assert len(booster.eval_sets_mse_[0]) == 20
 
     # Check if the columns names are set
     assert booster.columns_names_ is not None
