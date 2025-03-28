@@ -1,7 +1,7 @@
 import networkx as nx
 import numpy as np
 import pytest
-from extended_path_boost.utils.classes.single_metal_center_path_boost import SingleMetalCenterPathBoost
+from extended_path_boost.utils.classes.sequential_path_boost import SequentialPathBoost
 from sklearn.tree import DecisionTreeRegressor
 
 
@@ -19,7 +19,7 @@ def sample_graph_data():
 
 
 def test_single_metal_center_path_boost_initialization():
-    model = SingleMetalCenterPathBoost(
+    model = SequentialPathBoost(
         n_iter=50,
         max_path_length=5,
         learning_rate=0.05,
@@ -36,7 +36,7 @@ def test_single_metal_center_path_boost_initialization():
 
 
 def test_single_metal_center_path_boost_predict():
-    model = SingleMetalCenterPathBoost()
+    model = SequentialPathBoost()
     X = [nx.complete_graph(5), nx.complete_graph(6)]
     y = np.array([1, 0])
     list_anchor_nodes_labels = [[0], [1]]
@@ -48,7 +48,7 @@ def test_single_metal_center_path_boost_predict():
 
 
 def test_single_metal_center_path_boost_evaluate():
-    model = SingleMetalCenterPathBoost()
+    model = SequentialPathBoost()
     X = [nx.complete_graph(5), nx.complete_graph(6)]
     y = np.array([1, 0])
     list_anchor_nodes_labels = [[0], [1]]

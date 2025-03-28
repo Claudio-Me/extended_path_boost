@@ -10,7 +10,7 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 
 from examples_utils import get_full_nx_dataset_with_y
 from sklearn.model_selection import train_test_split
-from extended_path_boost.tests.test_datasets.load_test_dataset import get_nx_test_dataset, get_y
+from extended_path_boost.tests.datasets_used_for_tests.load_test_dataset import get_nx_test_dataset, get_y
 
 if __name__ == "__main__":
     # Load the dataset

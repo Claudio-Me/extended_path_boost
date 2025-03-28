@@ -23,7 +23,7 @@ import multiprocessing as mp
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from .utils.classes.single_metal_center_path_boost import SingleMetalCenterPathBoost
+from .utils.classes.sequential_path_boost import SequentialPathBoost
 from .utils import wrapper_path_boost_utils as wbu
 from .utils.classes.interfaces.interface_base_learner import BaseLearnerClassInterface
 from .utils.classes.interfaces.interface_selector import SelectorClassInterface
@@ -140,7 +140,7 @@ class PathBoost(BaseEstimator, RegressorMixin):
         train_datasets_for_each_anchor_label = []
         train_labels_for_each_anchor_label = []
 
-        self.models_list_: list[SingleMetalCenterPathBoost] = []
+        self.models_list_: list[SequentialPathBoost] = []
 
         # create a train dataset and model
         for i, _ in enumerate(self.list_anchor_nodes_labels_):
@@ -151,15 +151,15 @@ class PathBoost(BaseEstimator, RegressorMixin):
             train_labels_for_each_anchor_label.append(train_labels)
             if len(train_dataset) != 0:
                 self.models_list_.append(
-                    SingleMetalCenterPathBoost(n_iter=self.n_iter,
-                                               max_path_length=self.max_path_length,
-                                               learning_rate=self.learning_rate,
-                                               BaseLearnerClass=self.BaseLearnerClass,
-                                               SelectorClass=self.SelectorClass,
-                                               kwargs_for_base_learner=self.kwargs_for_base_learner,
-                                               kwargs_for_selector=self.kwargs_for_selector,
-                                               replace_nan_with=self.replace_nan_with,
-                                               verbose=self.verbose)
+                    SequentialPathBoost(n_iter=self.n_iter,
+                                        max_path_length=self.max_path_length,
+                                        learning_rate=self.learning_rate,
+                                        BaseLearnerClass=self.BaseLearnerClass,
+                                        SelectorClass=self.SelectorClass,
+                                        kwargs_for_base_learner=self.kwargs_for_base_learner,
+                                        kwargs_for_selector=self.kwargs_for_selector,
+                                        replace_nan_with=self.replace_nan_with,
+                                        verbose=self.verbose)
                 )
 
             else:
@@ -489,11 +489,6 @@ class PathBoost(BaseEstimator, RegressorMixin):
 
         util_validate_data(model=self, X=X, y=y, reset=reset, validate_separately=validate_separately, **check_params)
 
-        # check m_stops
-        m_stops = check_params.get('m_stops', None)
-        if m_stops is not None:
-            assert isinstance(m_stops, list) and all(isinstance(item, (int, type(None))) for item in m_stops)
-            assert len(m_stops) == len(self.list_anchor_nodes_labels)
 
         if not np.array_equal(y, "no_validation"):
             validate_data(self,
@@ -509,6 +504,8 @@ class PathBoost(BaseEstimator, RegressorMixin):
             return X
         elif not np.array_equal(y, "no_validation"):
             return y
+
+
 
 
 if __name__ == "__main__":

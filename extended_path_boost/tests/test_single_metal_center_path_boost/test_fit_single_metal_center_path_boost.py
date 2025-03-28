@@ -2,8 +2,8 @@ import networkx as nx
 import numpy as np
 import pytest
 from sklearn.model_selection import train_test_split
-from extended_path_boost.utils.classes.single_metal_center_path_boost import SingleMetalCenterPathBoost
-from extended_path_boost.tests.test_datasets.load_test_dataset import get_nx_test_dataset, get_y
+from extended_path_boost.utils.classes.sequential_path_boost import SequentialPathBoost
+from extended_path_boost.tests.datasets_used_for_tests.load_test_dataset import get_nx_test_dataset, get_y
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def sample_graph_data_for_check_eval_equal_training_ebm():
 def test_fit_eval_set_equal_to_train_dataset(sample_graph_data_for_check_eval_equal_training_ebm):
     """Test that fit method sets the is_fitted_ attribute."""
     X, y, anchor_labels = sample_graph_data_for_check_eval_equal_training_ebm
-    booster = SingleMetalCenterPathBoost(n_iter=200, max_path_length=5, learning_rate=0.5, verbose=True)
+    booster = SequentialPathBoost(n_iter=200, max_path_length=5, learning_rate=0.5, verbose=True)
     eval_set = [(X, y)]
     booster.fit(X, y, anchor_labels, "label", eval_set=eval_set)
 
@@ -125,7 +125,7 @@ def test_fit_eval_set_equal_to_train_dataset(sample_graph_data_for_check_eval_eq
 def test_fit_sets_is_fitted(sample_graph_data):
     """Test that fit method sets the is_fitted_ attribute."""
     X, y, anchor_labels = sample_graph_data
-    model = SingleMetalCenterPathBoost()
+    model = SequentialPathBoost()
     model.fit(X, y, anchor_labels, "attribute1")
     assert model.is_fitted_ is True
 
@@ -133,7 +133,7 @@ def test_fit_sets_is_fitted(sample_graph_data):
 def test_fit_sets_name_of_label_attribute(sample_graph_data):
     """Test that fit method sets name_of_label_attribute_ correctly."""
     X, y, anchor_labels = sample_graph_data
-    model = SingleMetalCenterPathBoost()
+    model = SequentialPathBoost()
     name_of_label_attribute = "attribute1"
     model.fit(X, y, anchor_labels, name_of_label_attribute)
     assert model.name_of_label_attribute_ == name_of_label_attribute
@@ -142,7 +142,7 @@ def test_fit_sets_name_of_label_attribute(sample_graph_data):
 def test_fit_returns_self(sample_graph_data):
     """Test that fit method returns self."""
     X, y, anchor_labels = sample_graph_data
-    model = SingleMetalCenterPathBoost()
+    model = SequentialPathBoost()
     result = model.fit(X, y, anchor_labels, "attribute1")
     assert result is model
 
@@ -150,7 +150,7 @@ def test_fit_returns_self(sample_graph_data):
 def test_fit_sets_train_mse(sample_graph_data):
     """Test that train_mse_ is set after fitting."""
     X, y, anchor_labels = sample_graph_data
-    model = SingleMetalCenterPathBoost()
+    model = SequentialPathBoost()
     model.fit(X, y, anchor_labels, "attribute1")
     assert hasattr(model, "train_mse_")
 
@@ -159,7 +159,7 @@ def test_fit_sets_eval_sets_mse(sample_graph_data):
     """Test that eval_sets_mse_ is set after fitting if eval_set is provided."""
     X, y, anchor_labels = sample_graph_data
     eval_set = [([X[0]], [y[0]])]
-    model = SingleMetalCenterPathBoost()
+    model = SequentialPathBoost()
     model.fit(X, y, anchor_labels, "attribute1", eval_set)
     assert hasattr(model, "eval_sets_mse_")
 
@@ -167,7 +167,7 @@ def test_fit_sets_eval_sets_mse(sample_graph_data):
 def test_fit_sets_columns_names(sample_graph_data):
     """Test that columns_names_ is set after fitting."""
     X, y, anchor_labels = sample_graph_data
-    model = SingleMetalCenterPathBoost()
+    model = SequentialPathBoost()
     model.fit(X, y, anchor_labels, "attribute1")
     assert hasattr(model, "columns_names_")
 
@@ -185,7 +185,7 @@ def test_single_metal_center_path_boost_fit_cop():
     X_train, X_test, y_train, y_test = train_test_split(nx_graphs, y, test_size=0.4, random_state=2)
 
     # Initialize the booster
-    booster = SingleMetalCenterPathBoost(n_iter=20, max_path_length=3, learning_rate=0.5)
+    booster = SequentialPathBoost(n_iter=20, max_path_length=3, learning_rate=0.5)
 
     # Define anchor nodes labels
     list_anchor_nodes_labels = [25, 47, 48, 80]

@@ -58,7 +58,9 @@ def util_validate_data(
 
     check_interface(model.SelectorClass, SelectorClassInterface)
 
-    # the following is jut to deal with the default parameters
+
+    # ------------------------------------------------------------------------------------------------------
+    # the following is just to set the default parameters for the selector class ant the base learner class
     if issubclass(model.BaseLearnerClass, DecisionTreeRegressor):
         if model.kwargs_for_base_learner is None:
             model.kwargs_for_base_learner = model._default_kwargs_for_base_learner
@@ -97,6 +99,12 @@ def util_validate_data(
 
     model.list_anchor_nodes_labels = list_anchor_nodes_labels
 
+    # check m_stops
+    # only for cyclic path boost
+    m_stops = check_params.get('m_stops', None)
+    if m_stops is not None:
+        assert isinstance(m_stops, list) and all(isinstance(item, (int, type(None))) for item in m_stops)
+        assert len(m_stops) == len(model.list_anchor_nodes_labels)
 
 
     # check eval sets

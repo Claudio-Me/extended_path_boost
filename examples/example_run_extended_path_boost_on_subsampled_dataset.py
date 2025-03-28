@@ -1,5 +1,5 @@
 from extended_path_boost._extended_path_boost import PathBoost
-from extended_path_boost.tests.test_datasets.load_test_dataset import get_nx_test_dataset, get_y
+from extended_path_boost.tests.datasets_used_for_tests.load_test_dataset import get_nx_test_dataset, get_y
 from sklearn.model_selection import train_test_split
 
 

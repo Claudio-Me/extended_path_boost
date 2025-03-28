@@ -1,7 +1,7 @@
 import networkx as nx
 import pytest
 from extended_path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
-from extended_path_boost.tests.test_datasets import load_test_dataset
+from extended_path_boost.tests.datasets_used_for_tests import load_test_dataset
 
 
 def test_find_labelled_path_in_molecule_graph():

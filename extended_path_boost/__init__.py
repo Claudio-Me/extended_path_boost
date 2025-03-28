@@ -2,11 +2,11 @@
 # License: BSD 3 clause
 
 from ._extended_path_boost import PathBoost
-from .utils.classes.single_metal_center_path_boost import SingleMetalCenterPathBoost
+from .utils.classes.sequential_path_boost import SequentialPathBoost
 from ._version import __version__
 
 __all__ = [
     "PathBoost",
-    "SingleMetalCenterPathBoost",
+    "SequentialPathBoost",
     "__version__",
 ]

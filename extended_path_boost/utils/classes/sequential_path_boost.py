@@ -7,6 +7,7 @@ import numpy as np
 from .interfaces.interface_base_learner import BaseLearnerClassInterface
 from .interfaces.interface_selector import SelectorClassInterface
 from ..validate_data import util_validate_data
+from util.variable_importance_according_to_path_boost import absolute_variable_importance
 from sklearn.base import BaseEstimator
 from sklearn.base import RegressorMixin
 from .extended_boosting_matrix import ExtendedBoostingMatrix
@@ -16,23 +17,21 @@ from .additive_model_wrapper import AdditiveModelWrapper
 from matplotlib.ticker import MaxNLocator
 
 
-class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
+class SequentialPathBoost(BaseEstimator, RegressorMixin):
     def __init__(self, n_iter=100, max_path_length=10, learning_rate=0.1, BaseLearnerClass=DecisionTreeRegressor,
                  kwargs_for_base_learner=None, SelectorClass=DecisionTreeRegressor, kwargs_for_selector=None,
-                 replace_nan_with=None,
+                 replace_nan_with=np.nan,
                  verbose=False):
-        if kwargs_for_base_learner is None:
-            kwargs_for_base_learner = {}
         self.n_iter = n_iter
         self.max_path_length = max_path_length
         self.learning_rate = learning_rate
         self.BaseLearnerClass = BaseLearnerClass
         self.verbose = verbose
         self.replace_nan_with = replace_nan_with
-        # very basic logic in the __init__ it is just to have a more clean code, it set kwargs with default dictionaries if no other input is given, it is possible to move the dictionaries as default parameters
         self.kwargs_for_base_learner = kwargs_for_base_learner
         self.SelectorClass = SelectorClass
         self.kwargs_for_selector = kwargs_for_selector
+
 
     def fit(self, X: list[nx.Graph], y: np.array, list_anchor_nodes_labels: list[tuple], name_of_label_attribute,
             eval_set: list[tuple[list[nx.Graph], Iterable]] = None):
@@ -84,6 +83,8 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
 
         self.name_of_label_attribute_ = name_of_label_attribute
 
+
+
         self.paths_selected_by_epb_ = set()
         self._initialize_path_boosting(X=X,
                                        list_anchor_nodes_labels=list_anchor_nodes_labels,
@@ -94,24 +95,30 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
             if self.verbose:
                 print("iteration number: ", n_interaction + 1)
 
+            self._ebm_has_been_expanded_in_this_iteration = False
+
             if n_interaction == 0:
                 best_path = self._find_best_path(train_ebm_dataframe=self.train_ebm_dataframe_, y=y)
+                self.selected_paths_by_iterations_.append(best_path)
             else:
 
                 negative_gradient = AdditiveModelWrapper._neg_gradient(y=y, y_hat=np.array(
                     self.base_learner_._last_train_prediction.to_numpy()))
                 best_path = self._find_best_path(train_ebm_dataframe=self.train_ebm_dataframe_,
                                                  y=pd.Series(negative_gradient))
+                self.selected_paths_by_iterations_.append(best_path)
 
             if self.verbose:
                 print("Best path: ", best_path)
 
             # expand the eval set in order to contain the selected columns path
-            self.expand_eval_ebm_dataframe_with_best_path(best_path=best_path, main_label_name=name_of_label_attribute,
-                                                          eval_set=eval_set)
+            self._expand_eval_ebm_dataframe_with_best_path(best_path=best_path, main_label_name=name_of_label_attribute,
+                                                           eval_set=eval_set)
 
             self.base_learner_.fit_one_step(X=self.train_ebm_dataframe_, y=y, best_path=best_path,
                                             eval_set=self.eval_set_ebm_df_and_target_)
+
+
 
             # expand the ebm dataframe with the new columns starting from the selected path
             self._expand_ebm_dataframe(X=X, selected_path=best_path, main_label_name=name_of_label_attribute)
@@ -125,7 +132,7 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
 
         return self
 
-    def expand_eval_ebm_dataframe_with_best_path(self, best_path, main_label_name, eval_set=None):
+    def _expand_eval_ebm_dataframe_with_best_path(self, best_path, main_label_name, eval_set=None):
         if eval_set is not None:
             columns_names = ExtendedBoostingMatrix.get_columns_related_to_path(best_path,
                                                                                self.train_ebm_dataframe_.columns)
@@ -141,7 +148,7 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
                     ebm_to_be_expanded=self.eval_set_ebm_df_and_target_[eval_set_number][0],
                     columns_names=missing_columns,
                     main_label_name=main_label_name,
-                    replace_nan_with= self.replace_nan_with)
+                    replace_nan_with=self.replace_nan_with)
                 self.eval_set_ebm_df_and_target_[eval_set_number][0] = pd.concat(
                     [self.eval_set_ebm_df_and_target_[eval_set_number][0], new_columns_for_eval_set], axis=1)
 
@@ -158,9 +165,14 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
         ebm_dataframe = ExtendedBoostingMatrix.generate_new_columns_from_columns_names(dataset=dataset,
                                                                                        columns_names=columns_names,
                                                                                        main_label_name=self.name_of_label_attribute_,
-                                                                                       replace_nan_with= self.replace_nan_with)
+                                                                                       replace_nan_with=self.replace_nan_with)
 
         return ebm_dataframe
+
+    def _get_feature_importance(self, selected_feature, ebm_dataframe)-> float:
+        # do something
+        variable_importance = absolute_variable_importance(path_boost=self)
+        return variable_importance
 
     def predict(self, X: list[nx.Graph] | None = None, ebm_dataframe: pd.DataFrame | None = None) -> list[
         numbers.Number]:
@@ -188,6 +200,7 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
         return self.base_learner_.evaluate(ebm_dataframe, y)
 
     def _expand_ebm_dataframe(self, X: list[nx.Graph], selected_path, main_label_name: str):
+        self._ebm_has_been_expanded_in_this_iteration = True
         if selected_path in self.paths_selected_by_epb_:
             return
         elif len(selected_path) >= self.max_path_length:
@@ -198,7 +211,7 @@ class SingleMetalCenterPathBoost(BaseEstimator, RegressorMixin):
                                                                                                selected_path=selected_path,
                                                                                                main_label_name=main_label_name,
                                                                                                df_to_be_expanded=self.train_ebm_dataframe_,
-                                                                                               replace_nan_with= self.replace_nan_with)
+                                                                                               replace_nan_with=self.replace_nan_with)
             self.train_ebm_dataframe_ = pd.concat([self.train_ebm_dataframe_, new_columns], axis=1)
 
     def _initialize_path_boosting(self, X, list_anchor_nodes_labels: list, main_label_name: str,

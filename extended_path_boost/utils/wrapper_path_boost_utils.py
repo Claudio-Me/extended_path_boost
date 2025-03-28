@@ -1,7 +1,7 @@
 import networkx as nx
 
 from .classes.extended_boosting_matrix import ExtendedBoostingMatrix
-from .classes.single_metal_center_path_boost import SingleMetalCenterPathBoost
+from .classes.sequential_path_boost import SequentialPathBoost
 
 
 def split_dataset_by_metal_centers(graphs_list: list[nx.Graph], anchor_nodes_label_name: str,
@@ -35,8 +35,8 @@ def split_dataset_by_metal_centers(graphs_list: list[nx.Graph], anchor_nodes_lab
     return indices_list
 
 
-def train_pattern_boosting(input_from_parallelization: tuple) -> SingleMetalCenterPathBoost | None:
-    model: SingleMetalCenterPathBoost = input_from_parallelization[0]
+def train_pattern_boosting(input_from_parallelization: tuple) -> SequentialPathBoost | None:
+    model: SequentialPathBoost = input_from_parallelization[0]
     if model is None:
         return None
     X = input_from_parallelization[1]
@@ -49,7 +49,7 @@ def train_pattern_boosting(input_from_parallelization: tuple) -> SingleMetalCent
 
 
 def parallel_predict(input_from_parallelization: tuple):
-    model: SingleMetalCenterPathBoost = input_from_parallelization[0]
+    model: SequentialPathBoost = input_from_parallelization[0]
     X = input_from_parallelization[1]
     if model is None or len(X) == 0:
         return None
@@ -58,7 +58,7 @@ def parallel_predict(input_from_parallelization: tuple):
 
 
 def parallel_predict_step_by_step(input_from_parallelization: tuple):
-    model: SingleMetalCenterPathBoost = input_from_parallelization[0]
+    model: SequentialPathBoost = input_from_parallelization[0]
     X = input_from_parallelization[1]
     if model is None or len(X) == 0:
         return None
