@@ -3,7 +3,7 @@ import copy
 import numpy as np
 import warnings
 import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from .extended_boosting_matrix import ExtendedBoostingMatrix
 from typing import Iterable
 from .interfaces.interface_base_learner import BaseLearnerClassInterface
@@ -11,8 +11,7 @@ from .interfaces.interface_base_learner import BaseLearnerClassInterface
 
 class AdditiveModelWrapper:
     def __init__(self, BaseModelClass, base_model_class_kwargs, learning_rate: float, ):
-        # model class will have an interface
-        # TODO add the interface
+
 
         # Ensure BaseModelClass respects BaseLearnerClassInterface
         if not issubclass(BaseModelClass, BaseLearnerClassInterface):
@@ -21,7 +20,9 @@ class AdditiveModelWrapper:
         self._last_train_prediction: pd.Series | None = None
 
         self.train_mse = []
+        self.train_mae = []
         self.eval_sets_mse: list[list[float]] = []
+        self.eval_sets_mae: list[list[float]] = []
         self.learning_rate = learning_rate
         self.base_learners_list: list = []
         self.considered_columns = []
@@ -58,8 +59,10 @@ class AdditiveModelWrapper:
             self._last_train_prediction = base_learner_prediction
 
             train_mse = mean_squared_error(y_true=y, y_pred=self._last_train_prediction)
-            self.train_mse.append(train_mse)
+            train_mae = mean_absolute_error(y_true=y, y_pred=self._last_train_prediction)
 
+            self.train_mse.append(train_mse)
+            self.train_mae.append(train_mae)
 
 
         else:
@@ -86,10 +89,14 @@ class AdditiveModelWrapper:
             self._last_train_prediction += base_learner_prediction
 
             train_mse = mean_squared_error(y_true=y, y_pred=self._last_train_prediction)
+            train_mae = mean_absolute_error(y_true=y, y_pred=self._last_train_prediction)
+
             self.train_mse.append(train_mse)
+            self.train_mae.append(train_mae)
 
         if eval_set is not None:
             this_iter_eval_set_mse: list[float | None] = [None for _ in range(len(eval_set))]
+            this_iter_eval_set_mae: list[float | None] = [None for _ in range(len(eval_set))]
 
             for i, eval_tuple in enumerate(eval_set):
                 if eval_tuple is None:
@@ -102,6 +109,7 @@ class AdditiveModelWrapper:
 
                 self._last_eval_set_prediction_[i] += base_learner_prediction
                 this_iter_eval_set_mse[i] = mean_squared_error(y_true=y_eval, y_pred=self._last_eval_set_prediction_[i])
+                this_iter_eval_set_mae[i] = mean_absolute_error(y_true=y_eval, y_pred=self._last_eval_set_prediction_[i])
 
             if len(self.eval_sets_mse) == 0:
                 for eval_set_error in this_iter_eval_set_mse:
@@ -109,6 +117,14 @@ class AdditiveModelWrapper:
             else:
                 for i, eval_set_error in enumerate(this_iter_eval_set_mse):
                     self.eval_sets_mse[i].append(eval_set_error)
+
+
+            if len(self.eval_sets_mae) == 0:
+                for eval_set_error in this_iter_eval_set_mae:
+                    self.eval_sets_mae.append([eval_set_error])
+            else:
+                for i, eval_set_error in enumerate(this_iter_eval_set_mae):
+                    self.eval_sets_mae[i].append(eval_set_error)
 
         return self
 

@@ -24,8 +24,9 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 from .utils.classes.sequential_path_boost import SequentialPathBoost
-from .utils import wrapper_path_boost_utils as wbu
+from .utils import cyclic_path_boost_utils as wbu
 from .utils.classes.interfaces.interface_base_learner import BaseLearnerClassInterface
+from .utils.variable_importance_according_to_path_boost import VariableImportance_ForSequentialPathBoost
 from .utils.classes.interfaces.interface_selector import SelectorClassInterface
 from .utils.validate_data import util_validate_data
 from typing import Iterable
@@ -79,11 +80,18 @@ class PathBoost(BaseEstimator, RegressorMixin):
         "anchor_nodes_label_name": [str],
         "verbose": [bool],
         "n_of_cores": [int],
+        "parameters_variable_importance": [dict, None]
     }
 
-    def __init__(self, n_iter=100, max_path_length=10, learning_rate=0.1, m_stops: list[int] = None,
+    def __init__(self, n_iter=100,
+                 max_path_length=10,
+                 learning_rate=0.1,
+                 m_stops: list[int] = None,
                  BaseLearnerClass=DecisionTreeRegressor,
-                 kwargs_for_base_learner=None, SelectorClass=DecisionTreeRegressor, kwargs_for_selector=None,
+                 kwargs_for_base_learner=None,
+                 SelectorClass=DecisionTreeRegressor,
+                 kwargs_for_selector=None,
+                 parameters_variable_importance=None,
                  replace_nan_with=np.nan,
                  verbose: bool = False, n_of_cores: int = 1):
 
@@ -98,6 +106,7 @@ class PathBoost(BaseEstimator, RegressorMixin):
         self.SelectorClass: type[SelectorClassInterface] = SelectorClass
         self.kwargs_for_selector: dict = kwargs_for_selector
         self.replace_nan_with = replace_nan_with
+        self.parameters_variable_importance = parameters_variable_importance
 
     @_fit_context(prefer_skip_nested_validation=True)
     def fit(self, X: list[nx.Graph], y: Iterable, anchor_nodes_label_name: str, list_anchor_nodes_labels: list[tuple],
@@ -127,7 +136,13 @@ class PathBoost(BaseEstimator, RegressorMixin):
         self.list_anchor_nodes_labels_ = list_anchor_nodes_labels
 
         X, y = self._validate_data(X, y, list_anchor_nodes_labels=list_anchor_nodes_labels, eval_set=eval_set,
-                                   m_stops=self.m_stops)
+                                   m_stops=self.m_stops,
+                                   parameters_variable_importance=self.parameters_variable_importance, )
+
+        # if variable importance is used, we need all the sub models to not normalize the data and eventually remember to normalize later
+        if self.parameters_variable_importance is not None:
+            self.normalize_path_importance_: bool = self.parameters_variable_importance.get('normalize', False)
+            self.parameters_variable_importance['normalize'] = False
 
         self.is_fitted_ = True
 
@@ -158,6 +173,7 @@ class PathBoost(BaseEstimator, RegressorMixin):
                                         SelectorClass=self.SelectorClass,
                                         kwargs_for_base_learner=self.kwargs_for_base_learner,
                                         kwargs_for_selector=self.kwargs_for_selector,
+                                        parameters_variable_importance=self.parameters_variable_importance,
                                         replace_nan_with=self.replace_nan_with,
                                         verbose=self.verbose)
                 )
@@ -194,6 +210,14 @@ class PathBoost(BaseEstimator, RegressorMixin):
             self.mse_eval_set_ = []
             for eval_tuple in eval_set:
                 self.mse_eval_set_.append(self.evaluate(X=eval_tuple[0], y=eval_tuple[1]))
+
+        if self.parameters_variable_importance is not None:
+            self.parameters_variable_importance['normalize'] = self.normalize_path_importance_
+
+
+            self.variable_importance_ = VariableImportance_ForSequentialPathBoost(
+                self.parameters_variable_importance, ).combine_variable_importance_from_list_of_sequential_models(
+                sequential_models=self.models_list_, )
 
         # `fit` should always return `self`
         return self
@@ -401,20 +425,20 @@ class PathBoost(BaseEstimator, RegressorMixin):
         This method is used to merge (average) the values (predictions) from a SingleMetalCenterPathBoost instance into the current instance of PathBoost
         """
 
-        predictions = [0 for _ in range(len_X)]
+        averaged_values = [0 for _ in range(len_X)]
         counter = [0 for _ in range(len_X)]
         for graph_number in range(len_X):
             for anchor_node_number in range(len(self.list_anchor_nodes_labels_)):
                 if graph_number in indexes_of_graphs_for_each_anchor_label[anchor_node_number]:
                     graph_position_in_sub_dataset = indexes_of_graphs_for_each_anchor_label[anchor_node_number].index(
                         graph_number)
-                    predictions[graph_number] += values_for_each_anchor_node[anchor_node_number][
+                    averaged_values[graph_number] += values_for_each_anchor_node[anchor_node_number][
                         graph_position_in_sub_dataset]
                     counter[graph_number] += 1
 
-        predictions = np.divide(predictions, counter, out=np.zeros_like(predictions), where=counter != 0)
+        averaged_values = np.divide(averaged_values, counter, out=np.zeros_like(averaged_values), where=counter != 0)
 
-        return predictions
+        return averaged_values
 
     def evaluate(self, X: list[nx.Graph], y: Iterable) -> list[float]:
 
@@ -426,12 +450,19 @@ class PathBoost(BaseEstimator, RegressorMixin):
             evolution_mse.append(mse)
         return evolution_mse
 
-    def plot_training_and_eval_errors(self):
+    def plot_training_and_eval_errors(self, skip_first_n_iterations: int | bool = True):
         """
         Plots the training and evaluation set errors over iterations.
         """
         # skip_the_first n iterations
-        n = int(2 / self.learning_rate)
+        if isinstance(skip_first_n_iterations, bool):
+            if skip_first_n_iterations:
+                n = int(2 / self.learning_rate)
+            else:
+                n = 0
+        else:
+            n = skip_first_n_iterations
+
         if len(self.train_mse_) > n:
             train_mse = self.train_mse_[n:]
         else:
@@ -440,7 +471,7 @@ class PathBoost(BaseEstimator, RegressorMixin):
         plt.figure(figsize=(12, 6))
 
         # Plot training errors
-        plt.plot(range(n, len(train_mse) + n), train_mse, label='Training Error', marker='.')
+        plt.plot(range(n, len(train_mse) + n), train_mse, label='Training Error', marker='')
 
         # Plot evaluation set errors if available
         if hasattr(self, 'mse_eval_set_'):
@@ -454,7 +485,7 @@ class PathBoost(BaseEstimator, RegressorMixin):
             for eval_set_index in range(num_eval_sets):
                 if eval_set_mse[eval_set_index][0] is not None:
                     plt.plot(range(n, num_iterations + n), eval_set_mse[eval_set_index],
-                             label=f'Evaluation Set {eval_set_index + 1} Error', marker='.')
+                             label=f'Evaluation Set {eval_set_index + 1}', marker='')
 
         plt.xlabel('Iteration')
         plt.ylabel('Mean Squared Error')
@@ -489,7 +520,6 @@ class PathBoost(BaseEstimator, RegressorMixin):
 
         util_validate_data(model=self, X=X, y=y, reset=reset, validate_separately=validate_separately, **check_params)
 
-
         if not np.array_equal(y, "no_validation"):
             validate_data(self,
                           X="no_validation",
@@ -504,8 +534,6 @@ class PathBoost(BaseEstimator, RegressorMixin):
             return X
         elif not np.array_equal(y, "no_validation"):
             return y
-
-
 
 
 if __name__ == "__main__":

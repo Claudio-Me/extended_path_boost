@@ -84,6 +84,27 @@ def util_validate_data(
     if model.kwargs_for_base_learner is None:
         model.kwargs_for_base_learner = {}
 
+    # check parameters for variable importance
+    parameters_variable_importance = check_params.get('parameters_variable_importance', None)
+    if parameters_variable_importance is not None:
+        assert isinstance(parameters_variable_importance, dict)
+        for key, value in parameters_variable_importance.items():
+            assert isinstance(key, str)
+            if key == 'criterion':
+                assert value in ['absolute', 'relative']
+            elif key == 'error_used':
+                assert value in ['mse', 'mae']
+            elif key == 'use_correlation':
+                assert isinstance(value, bool)
+            elif key == 'normalize':
+                assert isinstance(value, bool)
+            elif key == 'normalization_value':
+                assert value is None or isinstance(value, float)
+
+            else:
+                raise ValueError(f"Unknown parameter {key} for variable importance")
+
+
     # check list_anchor_nodes_labels
     list_anchor_nodes_labels = check_params.get('list_anchor_nodes_labels', None)
     if list_anchor_nodes_labels is not None:

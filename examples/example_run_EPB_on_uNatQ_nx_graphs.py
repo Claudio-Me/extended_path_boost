@@ -22,12 +22,12 @@ if __name__ == "__main__":
                            }
 
     # Initialize the PathBoost model
-    path_boost = PathBoost(n_iter=5000,
+    path_boost = PathBoost(n_iter=5,
                            max_path_length=6,
                            learning_rate=0.05,
                            kwargs_for_base_learner=kwargs_for_base_learner,
                            kwargs_for_selector=kwargs_for_selector,
-                           n_of_cores=10,
+                           n_of_cores=1,
                            verbose=True)
 
     # Define anchor nodes labels

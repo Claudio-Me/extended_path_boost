@@ -7,7 +7,8 @@ import numpy as np
 from .interfaces.interface_base_learner import BaseLearnerClassInterface
 from .interfaces.interface_selector import SelectorClassInterface
 from ..validate_data import util_validate_data
-from util.variable_importance_according_to_path_boost import absolute_variable_importance
+from ..variable_importance_according_to_path_boost import VariableImportance_ForSequentialPathBoost
+
 from sklearn.base import BaseEstimator
 from sklearn.base import RegressorMixin
 from .extended_boosting_matrix import ExtendedBoostingMatrix
@@ -18,8 +19,14 @@ from matplotlib.ticker import MaxNLocator
 
 
 class SequentialPathBoost(BaseEstimator, RegressorMixin):
-    def __init__(self, n_iter=100, max_path_length=10, learning_rate=0.1, BaseLearnerClass=DecisionTreeRegressor,
-                 kwargs_for_base_learner=None, SelectorClass=DecisionTreeRegressor, kwargs_for_selector=None,
+    def __init__(self, n_iter=100,
+                 max_path_length=10,
+                 learning_rate=0.1,
+                 BaseLearnerClass=DecisionTreeRegressor,
+                 kwargs_for_base_learner=None,
+                 SelectorClass=DecisionTreeRegressor,
+                 kwargs_for_selector=None,
+                 parameters_variable_importance=None,
                  replace_nan_with=np.nan,
                  verbose=False):
         self.n_iter = n_iter
@@ -31,7 +38,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         self.kwargs_for_base_learner = kwargs_for_base_learner
         self.SelectorClass = SelectorClass
         self.kwargs_for_selector = kwargs_for_selector
-
+        self.parameters_variable_importance = parameters_variable_importance
 
     def fit(self, X: list[nx.Graph], y: np.array, list_anchor_nodes_labels: list[tuple], name_of_label_attribute,
             eval_set: list[tuple[list[nx.Graph], Iterable]] = None):
@@ -77,13 +84,12 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                                              }
 
         self._validate_data(X=X, y=y, list_anchor_nodes_labels=list_anchor_nodes_labels,
-                            name_of_label_attribute=name_of_label_attribute, eval_set=eval_set)
+                            name_of_label_attribute=name_of_label_attribute, eval_set=eval_set,
+                            parameters_variable_importance=self.parameters_variable_importance)
 
         self.is_fitted_ = True
 
         self.name_of_label_attribute_ = name_of_label_attribute
-
-
 
         self.paths_selected_by_epb_ = set()
         self._initialize_path_boosting(X=X,
@@ -91,25 +97,46 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                                        main_label_name=name_of_label_attribute,
                                        eval_set=eval_set)
 
-        for n_interaction in range(self.n_iter):
-            if self.verbose:
-                print("iteration number: ", n_interaction + 1)
+        if self.parameters_variable_importance is not None:
+            self.class_variable_importance_: VariableImportance_ForSequentialPathBoost = VariableImportance_ForSequentialPathBoost(
+                **self.parameters_variable_importance)
 
+        for n_iteration in range(self.n_iter):
+            if self.verbose:
+                print("iteration number: ", n_iteration + 1)
+
+            # this is a parameter used for a check when computing variable importance, to make sure we are computing it on the right iteration, with the right ebm
             self._ebm_has_been_expanded_in_this_iteration = False
 
-            if n_interaction == 0:
-                best_path = self._find_best_path(train_ebm_dataframe=self.train_ebm_dataframe_, y=y)
-                self.selected_paths_by_iterations_.append(best_path)
+            if n_iteration == 0:
+                best_path = self._find_best_path(train_ebm_dataframe=self.train_ebm_dataframe_,
+                                                 y=y,
+                                                 SelectorClass=self.SelectorClass,
+                                                 kwargs_for_selector=self.kwargs_for_selector)
             else:
 
                 negative_gradient = AdditiveModelWrapper._neg_gradient(y=y, y_hat=np.array(
                     self.base_learner_._last_train_prediction.to_numpy()))
                 best_path = self._find_best_path(train_ebm_dataframe=self.train_ebm_dataframe_,
-                                                 y=pd.Series(negative_gradient))
-                self.selected_paths_by_iterations_.append(best_path)
+                                                 y=pd.Series(negative_gradient),
+                                                 SelectorClass=self.SelectorClass,
+                                                 kwargs_for_selector=self.kwargs_for_selector)
+
+
+
 
             if self.verbose:
                 print("Best path: ", best_path)
+
+            # we collect some values for variable importance, important that this operation it is done between the
+            # selection of the best path and the expansion of the ebm dataframe
+            if self.parameters_variable_importance is not None:
+                if n_iteration == 0:
+                    self.class_variable_importance_._update(path_boost=self, selected_path=best_path,
+                                                            iteration_number=n_iteration, gradient=y)
+                else:
+                    self.class_variable_importance_._update(path_boost=self, selected_path=best_path,
+                                                            iteration_number=n_iteration, gradient=negative_gradient)
 
             # expand the eval set in order to contain the selected columns path
             self._expand_eval_ebm_dataframe_with_best_path(best_path=best_path, main_label_name=name_of_label_attribute,
@@ -118,21 +145,25 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
             self.base_learner_.fit_one_step(X=self.train_ebm_dataframe_, y=y, best_path=best_path,
                                             eval_set=self.eval_set_ebm_df_and_target_)
 
-
-
             # expand the ebm dataframe with the new columns starting from the selected path
             self._expand_ebm_dataframe(X=X, selected_path=best_path, main_label_name=name_of_label_attribute)
 
         self.train_mse_ = self.base_learner_.train_mse
+        self.train_mae_ = self.base_learner_.train_mae
+
+        if self.parameters_variable_importance is not None:
+            self.variable_importance_:dict = self.class_variable_importance_.compute_variable_importance(path_boost=self)
 
         if eval_set is not None:
             self.eval_sets_mse_ = self.base_learner_.eval_sets_mse
+            self.eval_sets_mae_ = self.base_learner_.eval_sets_mae
 
         self.columns_names_ = self.train_ebm_dataframe_.columns
 
         return self
 
     def _expand_eval_ebm_dataframe_with_best_path(self, best_path, main_label_name, eval_set=None):
+        # we expand the ebm dataframe ONLY by adding the new columns related to the best path, we are not exploring new paths
         if eval_set is not None:
             columns_names = ExtendedBoostingMatrix.get_columns_related_to_path(best_path,
                                                                                self.train_ebm_dataframe_.columns)
@@ -168,11 +199,6 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                                                                                        replace_nan_with=self.replace_nan_with)
 
         return ebm_dataframe
-
-    def _get_feature_importance(self, selected_feature, ebm_dataframe)-> float:
-        # do something
-        variable_importance = absolute_variable_importance(path_boost=self)
-        return variable_importance
 
     def predict(self, X: list[nx.Graph] | None = None, ebm_dataframe: pd.DataFrame | None = None) -> list[
         numbers.Number]:
@@ -250,8 +276,25 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                                                                         base_model_class_kwargs=self.kwargs_for_base_learner,
                                                                         learning_rate=self.learning_rate, )
 
-    def _find_best_path(self, train_ebm_dataframe: pd.DataFrame, y) -> tuple[int]:
-        base_feature_selector = self.SelectorClass(**self.kwargs_for_selector)
+    @staticmethod
+    def _find_best_path(train_ebm_dataframe: pd.DataFrame, y, SelectorClass, kwargs_for_selector) -> tuple[int]:
+        """
+         Selects the path with the highest importance from a frequency-focused dataframe by training a feature selector,
+         identifying the most significant column, and extracting the corresponding path.
+
+         Note:important that this stays as static method because it is used also by the variable importance class, to select variable importance by comparison
+
+         Parameters:
+             train_ebm_dataframe (pd.DataFrame): Extended boosting matrix containing path frequency details.
+             y (array-like): The target values or negative gradient for path selection.
+             SelectorClass: A feature selector (e.g., a regressor) used to determine column importance.
+             kwargs_for_selector (dict): Configuration parameters for SelectorClass.
+
+         Returns:
+             tuple[int]: The path corresponding to the most important column.
+         """
+
+        base_feature_selector = SelectorClass(**kwargs_for_selector)
         frequency_boosting_matrix = ExtendedBoostingMatrix.get_frequency_boosting_matrix(train_ebm_dataframe)
 
         base_feature_selector = base_feature_selector.fit(X=frequency_boosting_matrix, y=y)

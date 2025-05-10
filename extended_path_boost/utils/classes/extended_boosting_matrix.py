@@ -122,7 +122,6 @@ class ExtendedBoostingMatrix:
                                                                                  id_label_name=main_label_name,
                                                                                  frequency_list=path_frequency_column)
 
-        graphs_new_labels = [[] for _ in range(len(dataset))]
         graphs_new_attributes = [[] for _ in range(len(dataset))]
         for graph_number, paths_in_graph in enumerate(effective_paths_in_graphs):
 
@@ -141,7 +140,6 @@ class ExtendedBoostingMatrix:
                         new_attributes.append(found_attributes)
                         new_labels.append(dataset[graph_number].nodes[new_path[-1]][main_label_name])
 
-            graphs_new_labels[graph_number] = new_labels
             graphs_new_attributes[graph_number] = new_attributes
 
         columns_for_dataframe = defaultdict(lambda: [[] for _ in range(len(dataset))])
@@ -359,6 +357,7 @@ class ExtendedBoostingMatrix:
 
         return extended_boosting_matrix_df
 
+
     @staticmethod
     def _remove_empty_list_values_from_df(df: pd.DataFrame, default_value=np.nan) -> pd.DataFrame:
         modified_df = df.map(lambda x: np.nan if isinstance(x, list) and len(x) == 0 else x)
@@ -400,3 +399,22 @@ class ExtendedBoostingMatrix:
                 columns_to_keep.append(column)
 
         return columns_to_keep
+
+    @staticmethod
+    def generate_frequency_column_name_for_path(path_label: tuple) -> str:
+        """
+        Generates a frequency column name for a given path.
+
+        Parameters
+        ----------
+        path : tuple
+            The path for which to generate the frequency column name.
+
+        Returns
+        -------
+        str
+            The generated frequency column name.
+        """
+        return \
+            ExtendedBoostingMatrix.generate_name_of_columns_for(path_label=path_label, attributes=[
+                ExtendedBoostingMatrix.frequency_column_name])[0]
