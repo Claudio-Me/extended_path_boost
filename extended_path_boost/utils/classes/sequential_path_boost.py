@@ -8,6 +8,7 @@ from .interfaces.interface_base_learner import BaseLearnerClassInterface
 from .interfaces.interface_selector import SelectorClassInterface
 from ..validate_data import util_validate_data
 from ..variable_importance_according_to_path_boost import VariableImportance_ForSequentialPathBoost
+from ..plots_functions import plot_training_and_eval_errors, plot_variable_importance_utils
 
 from sklearn.base import BaseEstimator
 from sklearn.base import RegressorMixin
@@ -15,6 +16,7 @@ from .extended_boosting_matrix import ExtendedBoostingMatrix
 from typing import Iterable
 from sklearn.tree import DecisionTreeRegressor
 from .additive_model_wrapper import AdditiveModelWrapper
+from sklearn.metrics import mean_squared_error
 from matplotlib.ticker import MaxNLocator
 
 
@@ -108,6 +110,10 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
             # this is a parameter used for a check when computing variable importance, to make sure we are computing it on the right iteration, with the right ebm
             self._ebm_has_been_expanded_in_this_iteration = False
 
+
+
+
+
             if n_iteration == 0:
                 best_path = self._find_best_path(train_ebm_dataframe=self.train_ebm_dataframe_,
                                                  y=y,
@@ -121,9 +127,6 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                                                  y=pd.Series(negative_gradient),
                                                  SelectorClass=self.SelectorClass,
                                                  kwargs_for_selector=self.kwargs_for_selector)
-
-
-
 
             if self.verbose:
                 print("Best path: ", best_path)
@@ -152,7 +155,8 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         self.train_mae_ = self.base_learner_.train_mae
 
         if self.parameters_variable_importance is not None:
-            self.variable_importance_:dict = self.class_variable_importance_.compute_variable_importance(path_boost=self)
+            self.variable_importance_: dict = self.class_variable_importance_.compute_variable_importance(
+                path_boost=self)
 
         if eval_set is not None:
             self.eval_sets_mse_ = self.base_learner_.eval_sets_mse
@@ -301,6 +305,10 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         best_feature_index = np.array(base_feature_selector.feature_importances_).argmax()
         best_feature = frequency_boosting_matrix.columns[best_feature_index]
         best_path = ExtendedBoostingMatrix.get_path_from_column_name(best_feature)
+
+
+
+
         return best_path
 
     def _validate_data(
@@ -312,36 +320,20 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
 
         util_validate_data(model=self, X=X, y=y, **check_params)
 
-    def plot_training_and_eval_errors(self):
+    def plot_training_and_eval_errors(self, skip_first_n_iterations=False):
         """
         Plots the training and evaluation set errors over iterations.
         """
-        # skip_the_first n iterations
-        n = int(2 / self.learning_rate)
-        train_mse = self.train_mse_[n:]
+        if hasattr(self, 'mse_eval_set_'):
+            eval_sets_mse = self.mse_eval_set_
+        else:
+            eval_sets_mse = None
+        plot_training_and_eval_errors(learning_rate=self.learning_rate, train_mse=self.train_mse_,
+                                      mse_eval_set=eval_sets_mse, skip_first_n_iterations=skip_first_n_iterations)
 
-        plt.figure(figsize=(12, 6))
-
-        # Plot training errors
-        plt.plot(range(n, len(train_mse) + n), train_mse, label='Training Error', marker='o')
-
-        # Plot evaluation set errors if available
-        if hasattr(self, 'eval_sets_mse_'):
-            eval_sets_mse = self.eval_sets_mse_[n:]
-            num_iterations = len(eval_sets_mse[0])
-            num_eval_sets = len(eval_sets_mse)
-            for eval_set_index in range(num_eval_sets):
-                if eval_sets_mse[eval_set_index][0] is not None:
-                    plt.plot(range(n, num_iterations + n), eval_sets_mse[eval_set_index],
-                             label=f'Evaluation Set {eval_set_index + 1} Error', marker='.')
-
-        plt.xlabel('Iteration')
-        plt.ylabel('Mean Squared Error')
-        plt.title('Training and Evaluation Set Errors Over Iterations')
-        plt.legend()
-        plt.grid(True)
-
-        # Ensure x-axis only shows integers
-        plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
-
-        plt.show()
+    def plot_variable_importance(self):
+        if self.parameters_variable_importance is None:
+            raise ValueError(
+                "Variable importance is not computed. Please set parameters_variable_importance in the constructor.")
+        plot_variable_importance_utils(variable_importance=self.variable_importance_,
+                                       parameters_variable_importance=self.parameters_variable_importance)

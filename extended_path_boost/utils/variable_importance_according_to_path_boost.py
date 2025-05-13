@@ -39,8 +39,10 @@ class VariableImportance_ForSequentialPathBoost:
         self.columns_at_iteration = []
         self.gradient_at_iteration = []
 
+
+
     def _update(self, path_boost: 'SequentialPathBoost', selected_path: tuple, iteration_number: int,
-                gradient: np.ndarray | None = None):
+                gradient: np.ndarray | None = None,):
         # update is used during training in sequential path boost to save, at each iteration the parameters needed later for the computation of the path importance
         # NB we expect that gradient is just y if we are in the first (0-th) iteration
         # NB we expect that absolute_error is None if we are in the first (0-th) iteration
@@ -58,6 +60,9 @@ class VariableImportance_ForSequentialPathBoost:
         self.columns_at_iteration.append(columns_names)
 
         self.gradient_at_iteration.append(gradient)
+
+
+
 
     def compute_absolute_variable_importance(self, path_boost: 'SequentialPathBoost') -> dict:
         # compute importance by error improvement
@@ -125,23 +130,24 @@ class VariableImportance_ForSequentialPathBoost:
             frequency_matrix_without_best_path = frequency_matrix_at_iteration.drop(frequency_path_name,
                                                                                     axis=1, inplace=False)
 
-            # ---------------------------------------------------------------------------------------------------
-            # TODO: remove this assert if code works
-            # check that we actually dropped the column
-            prev_columns_number = len(frequency_matrix_at_iteration.columns)
-            columns_number = len(frequency_matrix_without_best_path.columns)
-            assert prev_columns_number - 1 == columns_number
-            # ---------------------------------------------------------------------------------------------------
+
+
+            gradient = self.gradient_at_iteration[iteration]
 
             # get the second-best path
-            gradient = self.gradient_at_iteration[iteration]
+            if iteration == 0:
+                # in the first iteration we do not have a previous error to compare with so we skip
+                continue
+
+
             second_best_path = path_boost._find_best_path(train_ebm_dataframe=frequency_matrix_without_best_path,
                                                           y=gradient,
                                                           SelectorClass=path_boost.SelectorClass,
                                                           kwargs_for_selector=path_boost.kwargs_for_selector)
 
-            # fit a new base learner on the second-best path
 
+
+            # fit a new base learner on the second-best path
             columns_to_keep = ExtendedBoostingMatrix.get_columns_related_to_path(second_best_path,
                                                                                  train_ebm_dataframe_at_iteration.columns)
             restricted_df = train_ebm_dataframe_at_iteration[columns_to_keep]
@@ -165,9 +171,9 @@ class VariableImportance_ForSequentialPathBoost:
 
                 error_difference = new_base_learner_error - path_boost.train_mae_[iteration]
 
-            if error_difference > 0:
-                warnings.warn(
-                    f"error difference between error with best selected path and second best should be positive, but got {error_difference}")
+
+
+
 
             # update the error improvement
             error_improvement[selected_path_at_iteration] += error_difference
@@ -213,11 +219,14 @@ class VariableImportance_ForSequentialPathBoost:
             frequency_name_of_path = ExtendedBoostingMatrix.generate_frequency_column_name_for_path(path_label=path)
             correlation_variable_importance[path] = variable_importance[path]
             for second_path in variable_importance.keys():
+
                 frequency_name_of_second_path = ExtendedBoostingMatrix.generate_frequency_column_name_for_path(
                     path_label=second_path)
                 if len(path) > len(second_path) and path[:len(second_path)] == second_path:
                     corr = correlation_matrix.loc[frequency_name_of_path, frequency_name_of_second_path]
-                    correlation_variable_importance[path] += corr * variable_importance[second_path]
+                    if not pd.isna(corr):
+                        # we want to add the correlation only if it is not nan, it is nan
+                        correlation_variable_importance[path] += corr * variable_importance[second_path]
 
         return correlation_variable_importance
 

@@ -6,11 +6,10 @@ from extended_path_boost._extended_path_boost import PathBoost
 import os
 import json
 import uuid
-from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.model_selection import GridSearchCV
 
-from examples_utils import get_full_nx_dataset_with_y
 from sklearn.model_selection import train_test_split
-from extended_path_boost.tests.datasets_used_for_tests.load_test_dataset import get_nx_test_dataset, get_y
+from tests import get_nx_test_dataset, get_y
 
 if __name__ == "__main__":
     # Load the dataset
@@ -32,7 +31,6 @@ if __name__ == "__main__":
     path_boost = PathBoost(n_iter=5, n_of_cores=11, verbose=False)
 
     score = 'neg_mean_squared_error'
-    score = None
     # Initialize GridSearchCV
     grid_search = GridSearchCV(estimator=path_boost, param_grid=param_grid, cv=2, scoring=score,
                                verbose=3)

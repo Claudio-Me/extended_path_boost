@@ -1,7 +1,6 @@
 import networkx as nx
-import pytest
 from extended_path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
-from extended_path_boost.tests.datasets_used_for_tests import load_test_dataset
+from tests.datasets_used_for_tests import load_test_dataset
 
 
 def test_on_molecules_dataset():

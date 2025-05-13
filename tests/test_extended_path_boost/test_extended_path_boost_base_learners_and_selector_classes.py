@@ -5,7 +5,7 @@ from sklearn.linear_model import LinearRegression
 from xgboost import XGBRegressor
 from sklearn.model_selection import train_test_split
 from extended_path_boost._extended_path_boost import PathBoost
-from extended_path_boost.tests.datasets_used_for_tests.load_test_dataset import get_nx_test_dataset, get_y
+from tests.datasets_used_for_tests.load_test_dataset import get_nx_test_dataset, get_y
 
 @pytest.fixture
 def dataset():

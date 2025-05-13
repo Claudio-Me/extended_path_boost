@@ -29,38 +29,57 @@ from .utils.classes.interfaces.interface_base_learner import BaseLearnerClassInt
 from .utils.variable_importance_according_to_path_boost import VariableImportance_ForSequentialPathBoost
 from .utils.classes.interfaces.interface_selector import SelectorClassInterface
 from .utils.validate_data import util_validate_data
+from .utils.plots_functions import plot_training_and_eval_errors, plot_variable_importance_utils
 from typing import Iterable
 from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin, _fit_context
 from sklearn.metrics import mean_squared_error
 from sklearn.utils.validation import check_is_fitted, validate_data
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.base import RegressorMixin
-from matplotlib.ticker import MaxNLocator
 
 
 class PathBoost(BaseEstimator, RegressorMixin):
-    """A template estimator to be used as a reference implementation.
+    """
+    PathBoost is an ensemble learning method that builds a model by iteratively fitting
+    SequentialPathBoost models on different subsets of the data, partitioned by anchor nodes.
+    It is designed for graph-based data where paths originating from specified anchor nodes
+    are used as features.
 
-    For more information regarding how to build your own estimator, read more
-    in the :ref:`User Guide <user_guide>`.
+    The model trains a separate `SequentialPathBoost` instance for each unique anchor node
+    label provided. Predictions are then aggregated (averaged) from these individual models.
+    It supports parallel training of the `SequentialPathBoost` models across multiple cores.
 
     Parameters
     ----------
-    demo_param : str, default='demo_param'
-        A parameter used for demonstration of how to pass and store parameters.
-
-    Attributes
-    ----------
-    is_fitted_ : bool
-        A boolean indicating whether the estimator has been fitted.
-
-    n_features_in_ : int
-        Number of features seen during :term:`fit`.
-
-    feature_names_in_ : ndarray of shape (`n_features_in_`,)
-        Names of features seen during :term:`fit`. Defined only when `X`
-        has feature names that are all strings.
-
+    n_iter : int, default=100
+        The number of boosting iterations to perform for each `SequentialPathBoost` model.
+    max_path_length : int, default=10
+        The maximum length of paths to consider as features.
+    learning_rate : float, default=0.1
+        The learning rate shrinks the contribution of each base learner in the `SequentialPathBoost` model.
+    m_stops : list[int], default=None
+        A list of iteration numbers at which to stop boosting for specific models.
+        Currently, this parameter is validated but not fully implemented in the core logic.
+    BaseLearnerClass : type, default=sklearn.tree.DecisionTreeRegressor
+        The class of the base learner to be used within each boosting iteration in the `SequentialPathBoost` model.
+        Must implement the `BaseLearnerClassInterface`.
+    kwargs_for_base_learner : dict, default=None
+        Keyword arguments to be passed to the constructor of the `BaseLearnerClass`.
+    SelectorClass : type, default=sklearn.tree.DecisionTreeRegressor
+        The class of the feature selector used to identify the best paths in each iteration.
+        Must implement the `SelectorClassInterface`.
+    kwargs_for_selector : dict, default=None
+        Keyword arguments to be passed to the constructor of the `SelectorClass`.
+    parameters_variable_importance : dict, default=None
+        Parameters for computing variable importance. If None, variable importance is not computed.
+        Expected keys include 'criterion' = 'absolute' or 'relative', 'error_used' = 'mse' or 'mae', 'use_correlation' = True or False, 'normalize' = True or False.
+    replace_nan_with : any, default=np.nan
+        Value used to replace NaN values encountered during feature generation. It is needed for some base learners like linear models who can not deal with NaN values.
+    verbose : bool, default=False
+        If True, prints progress messages during fitting.
+    n_of_cores : int, default=1
+        The number of CPU cores to use for parallel training of `SequentialPathBoost` models.
+        If 1, training is sequential.
     """
 
     # This is a dictionary allowing to define the type of parameters.
@@ -111,19 +130,41 @@ class PathBoost(BaseEstimator, RegressorMixin):
     @_fit_context(prefer_skip_nested_validation=True)
     def fit(self, X: list[nx.Graph], y: Iterable, anchor_nodes_label_name: str, list_anchor_nodes_labels: list[tuple],
             eval_set: list[tuple[list[nx.Graph], Iterable]] | None = None):
-        """A reference implementation of a fitting function.
+        """
+        Fits the PathBoost model to the training data.
+
+        This method trains a `SequentialPathBoost` model for each unique anchor node label.
+        The training data `X` and `y` are partitioned based on `list_anchor_nodes_labels`
+        and `anchor_nodes_label_name`. Each partition is used to train a corresponding
+        `SequentialPathBoost` model. If `n_of_cores` is greater than 1, these models
+        are trained in parallel.
+
+        The method also handles the initialization of variable importance computation
+        if `parameters_variable_importance` is set. After training, it computes
+        the overall training Mean Squared Error (MSE) and, if `eval_set` is provided,
+        the MSE for each evaluation set.
 
         Parameters
         ----------
-
-        y : array-like, shape (n_samples,) or (n_samples, n_outputs)
-            The target values (class labels in classification, real numbers in
-            regression).
+        X : list[nx.Graph]
+            A list of NetworkX graph objects representing the training input samples.
+        y : Iterable
+            The target values (real numbers in regression) corresponding to `X`.
+            Must be array-like of shape (n_samples,) or (n_samples, n_outputs).
+        anchor_nodes_label_name : str
+            The name of the node attribute in the graphs that identifies the anchor nodes.
+        list_anchor_nodes_labels : list[tuple]
+            A list of unique labels for the anchor nodes. The data will be partitioned
+            based on these labels, and a separate `SequentialPathBoost` model will be
+            trained for each.
+        eval_set : list[tuple[list[nx.Graph], Iterable]] | None, default=None
+            A list of (X_eval, y_eval) tuples for monitoring the model's performance
+            on one or more evaluation sets during training.
 
         Returns
         -------
         self : object
-            Returns self.
+            The fitted PathBoost estimator.
         """
 
         self._default_kwargs_for_base_learner = {'max_depth': 3, 'random_state': 0,
@@ -212,15 +253,17 @@ class PathBoost(BaseEstimator, RegressorMixin):
                 self.mse_eval_set_.append(self.evaluate(X=eval_tuple[0], y=eval_tuple[1]))
 
         if self.parameters_variable_importance is not None:
-            self.parameters_variable_importance['normalize'] = self.normalize_path_importance_
-
-
-            self.variable_importance_ = VariableImportance_ForSequentialPathBoost(
-                self.parameters_variable_importance, ).combine_variable_importance_from_list_of_sequential_models(
-                sequential_models=self.models_list_, )
+            self.compute_variable_importance()
 
         # `fit` should always return `self`
         return self
+
+    def compute_variable_importance(self):
+        self.parameters_variable_importance['normalize'] = self.normalize_path_importance_
+
+        self.variable_importance_ = VariableImportance_ForSequentialPathBoost(
+            **self.parameters_variable_importance, ).combine_variable_importance_from_list_of_sequential_models(
+            sequential_models=self.models_list_, )
 
     def _compute_train_mse(self, number_of_observations_for_each_model: list[int]):
         train_mse = np.zeros(self.n_iter)
@@ -454,49 +497,19 @@ class PathBoost(BaseEstimator, RegressorMixin):
         """
         Plots the training and evaluation set errors over iterations.
         """
-        # skip_the_first n iterations
-        if isinstance(skip_first_n_iterations, bool):
-            if skip_first_n_iterations:
-                n = int(2 / self.learning_rate)
-            else:
-                n = 0
-        else:
-            n = skip_first_n_iterations
-
-        if len(self.train_mse_) > n:
-            train_mse = self.train_mse_[n:]
-        else:
-            train_mse = self.train_mse_
-
-        plt.figure(figsize=(12, 6))
-
-        # Plot training errors
-        plt.plot(range(n, len(train_mse) + n), train_mse, label='Training Error', marker='')
-
-        # Plot evaluation set errors if available
         if hasattr(self, 'mse_eval_set_'):
-            if len(self.mse_eval_set_[0]) > n:
-                eval_set_mse = [self.mse_eval_set_[i][n:] for i in range(len(self.mse_eval_set_))]
-            else:
-                eval_set_mse = self.mse_eval_set_
+            eval_sets_mse = self.mse_eval_set_
+        else:
+            eval_sets_mse = None
+        plot_training_and_eval_errors(learning_rate=self.learning_rate, train_mse=self.train_mse_,
+                                      mse_eval_set=eval_sets_mse, skip_first_n_iterations=skip_first_n_iterations)
 
-            num_iterations = len(eval_set_mse[0])
-            num_eval_sets = len(eval_set_mse)
-            for eval_set_index in range(num_eval_sets):
-                if eval_set_mse[eval_set_index][0] is not None:
-                    plt.plot(range(n, num_iterations + n), eval_set_mse[eval_set_index],
-                             label=f'Evaluation Set {eval_set_index + 1}', marker='')
-
-        plt.xlabel('Iteration')
-        plt.ylabel('Mean Squared Error')
-        plt.title('Training and Evaluation Set Errors Over Iterations')
-        plt.legend()
-        plt.grid(True)
-
-        # Ensure x-axis only shows integers
-        plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
-
-        plt.show()
+    def plot_variable_importance(self):
+        if self.parameters_variable_importance is None:
+            raise ValueError(
+                "Variable importance is not computed. Please set parameters_variable_importance in the constructor.")
+        plot_variable_importance_utils(variable_importance=self.variable_importance_,
+                                       parameters_variable_importance=self.parameters_variable_importance)
 
     def score(self, X, y, sample_weight=None):
         # This method is used to evaluate the model on the given data.
