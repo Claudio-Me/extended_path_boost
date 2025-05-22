@@ -72,15 +72,9 @@ class AdditiveModelWrapper:
                 negative_gradient = self._neg_gradient(y=y, y_hat=self._last_train_prediction)
             new_y = pd.Series(negative_gradient)
 
-            new_base_learner.fit(restricted_df, new_y)
 
-            # ----------------------------------------------------------------------------------------
-            # debugging
-            # Plot the tree
-            # plt.figure(figsize=(12, 8))
-            # tree.plot_tree(new_base_learner, filled=True, feature_namesTrue)
-            # plt.show()
-            # ----------------------------------------------------------------------------------------
+
+            new_base_learner.fit(restricted_df, new_y)
 
             self.base_learners_list.append(new_base_learner)
             self.considered_columns.append(columns_to_keep)

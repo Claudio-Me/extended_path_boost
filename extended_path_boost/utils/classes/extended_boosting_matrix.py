@@ -70,6 +70,8 @@ class ExtendedBoostingMatrix:
                                               path_labels: list, main_label_name: str,
                                               frequency_column, replace_nan_with=np.nan) -> pd.DataFrame:
         # given a list that reppresent the labels of a path it returns the new columns for this path
+
+        # note: this frequency column is used only to indicate if a graph should be considered or not, a new frequency column with the number of times the path is present in the graph is created later
         if frequency_column is None:
             frequency_column = [1] * len(dataset)
 
@@ -195,7 +197,33 @@ class ExtendedBoostingMatrix:
     @staticmethod
     def find_paths_in_dataset(dataset: list[nx.Graph], path_labels: list | tuple,
                               id_label_name: str, frequency_list=None) -> list[list]:
+        """
+        Finds paths in a dataset of graphs based on provided path labels.
 
+        This method processes a list of NetworkX graphs and identifies, for each graph, all paths that match
+        the given sequence of labels (`path_labels`). Each returned path consists of nodes whose labels follow
+        the specified label sequence. Optionally, a `frequency_list` can be provided to control whether paths are
+        searched in each graph.
+
+        Parameters
+        ----------
+        dataset : list of nx.Graph
+            List of NetworkX graph objects representing the dataset.
+        path_labels : list or tuple
+            Sequence of labels defining the desired path to search for in each graph.
+        id_label_name : str
+            The node attribute name used to match labels in the graphs.
+        frequency_list : list of int or None, optional
+            List of integers indicating whether to search for paths in each graph (default is None,
+            which treats all graphs as active).
+
+        Returns
+        -------
+        list of list
+            A list where each element contains the identified paths for a graph in the dataset.
+            Each path is represented as a list of node IDs following `path_labels`.
+        """
+        # it returns a list of paths for each graph in the dataset each path is a list of nodes who follows the path_labels
         if frequency_list is None:
             frequency_list = [1] * len(dataset)
         assert len(frequency_list) == len(dataset)
@@ -323,7 +351,24 @@ class ExtendedBoostingMatrix:
         if attributes is None:
             return None
         else:
-            return [str(path_label) + '_' + str(attribute) for attribute in attributes]
+            # we parse the tuple to pytin numbers because we had some problems, sometimes it contains numpy integers that are not correctly translated when str() method is appled
+            path_in_python_numbers=ExtendedBoostingMatrix._parse_to_python_numbers(path_label)
+            return [str(path_in_python_numbers) + '_' + str(attribute) for attribute in attributes]
+
+    @staticmethod
+    def _parse_to_python_numbers(obj):
+        if isinstance(obj, tuple):
+            return tuple(ExtendedBoostingMatrix._parse_to_python_numbers(x) for x in obj)
+        elif isinstance(obj, list):
+            return [ExtendedBoostingMatrix._parse_to_python_numbers(x) for x in obj]
+        elif isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, numbers.Number):
+            return obj
+        else:
+            return obj
 
     @staticmethod
     def combine_attribute_value_of_multiple_paths_in_the_same_graph(values: list[numbers.Number]):
@@ -357,7 +402,6 @@ class ExtendedBoostingMatrix:
 
         return extended_boosting_matrix_df
 
-
     @staticmethod
     def _remove_empty_list_values_from_df(df: pd.DataFrame, default_value=np.nan) -> pd.DataFrame:
         modified_df = df.map(lambda x: np.nan if isinstance(x, list) and len(x) == 0 else x)
@@ -378,7 +422,7 @@ class ExtendedBoostingMatrix:
         string_path = column_name.split('_', 1)[0]
         path = ast.literal_eval(string_path)
         # this assert can be removed it is used during coding to make sure no error happens here
-        assert isinstance(path, tuple)
+        assert isinstance(path, tuple), "error in the columns name"
         return path
 
     @staticmethod

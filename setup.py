@@ -11,7 +11,7 @@ setup(
     license='MIT License',
     author='Claudio',
     classifiers=[
-        "license :: OSI Approved :: MIT License",
+        "license ::This template covers installation, usage, features, and links to documentation and contribution guidelines. Adjust as needed for your project specifics.This template covers installation, usage, features, and links to documentation and contribution guidelines. Adjust as needed for your project specifics. MIT License",
         "Programming Language :: Python :: 3.11",
         "Operating System :: OS Independent",
         "Intended Audience :: Science/Research",

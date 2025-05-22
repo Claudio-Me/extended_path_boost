@@ -87,7 +87,7 @@ class PathBoost(BaseEstimator, RegressorMixin):
     _parameter_constraints = {
         "n_iter": [int],
         "max_path_length": [int],
-        "learning_rate": [float],
+        "learning_rate": [numbers.Integral, numbers.Real],
         "base_learner_kwargs": [dict, None],
         "BaseLearnerClass": [type],
         "SelectorClass": [type],
@@ -152,7 +152,8 @@ class PathBoost(BaseEstimator, RegressorMixin):
             The target values (real numbers in regression) corresponding to `X`.
             Must be array-like of shape (n_samples,) or (n_samples, n_outputs).
         anchor_nodes_label_name : str
-            The name of the node attribute in the graphs that identifies the anchor nodes.
+            The name of the node attribute in the graphs that identifies the attribute used to identify the anchor nodes.
+            e.g. if the anchor nodes are defined by the atomic number, this should be "feature_atomic_number".
         list_anchor_nodes_labels : list[tuple]
             A list of unique labels for the anchor nodes. The data will be partitioned
             based on these labels, and a separate `SequentialPathBoost` model will be
@@ -493,11 +494,11 @@ class PathBoost(BaseEstimator, RegressorMixin):
             evolution_mse.append(mse)
         return evolution_mse
 
-    def plot_training_and_eval_errors(self, skip_first_n_iterations: int | bool = True):
+    def plot_training_and_eval_errors(self, skip_first_n_iterations: int | bool = True, plot_eval_sets_error=True):
         """
         Plots the training and evaluation set errors over iterations.
         """
-        if hasattr(self, 'mse_eval_set_'):
+        if hasattr(self, 'mse_eval_set_') and plot_eval_sets_error is True:
             eval_sets_mse = self.mse_eval_set_
         else:
             eval_sets_mse = None

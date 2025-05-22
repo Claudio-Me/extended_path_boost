@@ -39,10 +39,8 @@ class VariableImportance_ForSequentialPathBoost:
         self.columns_at_iteration = []
         self.gradient_at_iteration = []
 
-
-
     def _update(self, path_boost: 'SequentialPathBoost', selected_path: tuple, iteration_number: int,
-                gradient: np.ndarray | None = None,):
+                gradient: np.ndarray | None = None, ):
         # update is used during training in sequential path boost to save, at each iteration the parameters needed later for the computation of the path importance
         # NB we expect that gradient is just y if we are in the first (0-th) iteration
         # NB we expect that absolute_error is None if we are in the first (0-th) iteration
@@ -61,9 +59,6 @@ class VariableImportance_ForSequentialPathBoost:
 
         self.gradient_at_iteration.append(gradient)
 
-
-
-
     def compute_absolute_variable_importance(self, path_boost: 'SequentialPathBoost') -> dict:
         # compute importance by error improvement
         # if we are in the first iteration there is no previous error to compare with, then we set it equal to the second eror improvement
@@ -76,25 +71,28 @@ class VariableImportance_ForSequentialPathBoost:
         # it means we are in a new iteration, but we still have to train the base_learner
 
         error_improvement = defaultdict(float)
+        previous_improvement = 0
         for iteration in range(path_boost.n_iter):
+
             if iteration == 0:
                 # in the first iteration we do not have a previous error to compare with so we skip
                 pass
             else:
-
                 path = self.selected_path_at_iteration[iteration]
                 if self.error_used == 'mse':
                     improvement = path_boost.train_mse_[iteration - 1] - path_boost.train_mse_[iteration]
-                    if improvement < 0:
-                        warnings.warn(
-                            f"error improvement between iteration {iteration} and {iteration - 1} is negative, but should be positive")
+                    if improvement < 0 and previous_improvement > 0:
+                        print(
+                            f"error improvement between iteration {iteration} and {iteration - 1} is negative ({improvement}). This is expected by the algorithm, but it might be a sign of overfitting even if we are comparing the improvement on the train error")
                     error_improvement[path] += improvement
+
                 elif self.error_used == 'mae':
                     improvement = path_boost.train_mae_[iteration - 1] - path_boost.train_mae_[iteration]
-                    if improvement < 0:
-                        warnings.warn(
-                            f"error improvement between iteration {iteration} and {iteration - 1} is negative, but should be positive")
+                    if improvement < 0 and previous_improvement > 0:
+                        print(
+                            f"error improvement between iteration {iteration} and {iteration - 1} is negative. This is expected in by the algorithm, but it might be a sign of overfitting even tho we are comparing the improvement on the train error")
                     error_improvement[path] += improvement
+                previous_improvement = improvement
 
                 if iteration == 1:
                     # since we did not set any importance for the path selected in the zeroth iteration,
@@ -130,8 +128,6 @@ class VariableImportance_ForSequentialPathBoost:
             frequency_matrix_without_best_path = frequency_matrix_at_iteration.drop(frequency_path_name,
                                                                                     axis=1, inplace=False)
 
-
-
             gradient = self.gradient_at_iteration[iteration]
 
             # get the second-best path
@@ -139,13 +135,10 @@ class VariableImportance_ForSequentialPathBoost:
                 # in the first iteration we do not have a previous error to compare with so we skip
                 continue
 
-
             second_best_path = path_boost._find_best_path(train_ebm_dataframe=frequency_matrix_without_best_path,
                                                           y=gradient,
                                                           SelectorClass=path_boost.SelectorClass,
                                                           kwargs_for_selector=path_boost.kwargs_for_selector)
-
-
 
             # fit a new base learner on the second-best path
             columns_to_keep = ExtendedBoostingMatrix.get_columns_related_to_path(second_best_path,
@@ -170,10 +163,6 @@ class VariableImportance_ForSequentialPathBoost:
                                                              y_pred=new_base_learner_prediction)
 
                 error_difference = new_base_learner_error - path_boost.train_mae_[iteration]
-
-
-
-
 
             # update the error improvement
             error_improvement[selected_path_at_iteration] += error_difference
@@ -230,17 +219,17 @@ class VariableImportance_ForSequentialPathBoost:
 
         return correlation_variable_importance
 
-
-    def combine_variable_importance_from_list_of_sequential_models(self, sequential_models: list,) -> dict:
+    def combine_variable_importance_from_list_of_sequential_models(self, sequential_models: list, ) -> dict:
 
         variable_importance_dictionary = defaultdict(list)
         total_obs = 0
         for sequential_model in sequential_models:
-            # we want to get the variable importance of each model and sum all them up
-            n_obs = sequential_model.train_ebm_dataframe_.shape[0]
-            total_obs += n_obs
-            for key, value in sequential_model.variable_importance_.items():
-                variable_importance_dictionary[key].append(value * n_obs)
+            if sequential_model is not None:
+                # we want to get the variable importance of each model and sum all them up
+                n_obs = sequential_model.train_ebm_dataframe_.shape[0]
+                total_obs += n_obs
+                for key, value in sequential_model.variable_importance_.items():
+                    variable_importance_dictionary[key].append(value * n_obs)
 
         averaged_variable_importance = {}
         for key, value_list in variable_importance_dictionary.items():
@@ -253,6 +242,6 @@ class VariableImportance_ForSequentialPathBoost:
             total_error_improvement = sum(averaged_variable_importance.values())
             for path in averaged_variable_importance.keys():
                 averaged_variable_importance[path] = (averaged_variable_importance[
-                                                    path] / total_error_improvement) * self.normalization_value
+                                                          path] / total_error_improvement) * self.normalization_value
 
         return averaged_variable_importance

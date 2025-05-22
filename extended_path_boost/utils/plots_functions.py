@@ -6,8 +6,23 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
                                   mse_eval_set: list | None = None, skip_first_n_iterations: int | bool = False,
                                   show=True, save=False):
     """
-    Plots the training and evaluation set errors over iterations.
-    """
+        Plots the training Mean Squared Error (MSE) and, if given, the MSE for multiple
+        evaluation sets over the boosting iterations.
+
+        Parameters
+        ----------
+        learning_rate : float
+            The learning rate used during training, used to adjust the x-axis.
+        train_mse : list[float]
+            A list of training MSE values, where each element corresponds to an iteration.
+        mse_eval_set : list[list[float]] | None, default=None
+            A list of lists, where each inner list contains MSE values for an evaluation
+            set over iterations. If None, only training MSE is plotted.
+        skip_first_n_iterations : int | bool, default=True
+            If True, the first iteration's errors are skipped in the plot (often an outlier).
+            If an integer, that many initial iterations are skipped.
+            If False or 0, all iterations are plotted.
+        """
     # skip_the_first n iterations
     if isinstance(skip_first_n_iterations, bool):
         if skip_first_n_iterations:
@@ -40,7 +55,7 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
             if eval_set_mse[eval_set_index][0] is not None:
                 plt.plot(range(n, num_iterations + n), eval_set_mse[eval_set_index],
                          label=f'Evaluation Set {eval_set_index + 1}', marker='')
-
+    
     plt.xlabel('Iteration')
     plt.ylabel('Mean Squared Error')
     plt.title('Training and Evaluation Set Errors Over Iterations')
@@ -60,6 +75,20 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
 def plot_variable_importance_utils(variable_importance: dict, parameters_variable_importance: dict):
     """
     Plots the variable importance scores.
+
+    This function visualizes the importance of features
+    as computed by the PathBoost or SequentialPathBoost models. The appearance and
+    details of the plot can be influenced by the parameters used to compute
+    the variable importance.
+
+    Parameters
+    ----------
+    variable_importance : dict
+        A dictionary where keys are feature identifiers and values are their corresponding importance scores.
+    parameters_variable_importance : dict
+        A dictionary containing parameters that were used for computing
+        variable importance (e.g., 'criterion', 'normalize') and potentially
+        other parameters to guide the plotting.
     """
 
     assert isinstance(variable_importance, dict), "Variable importance should be a dictionary."
