@@ -24,6 +24,8 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
     def __init__(self, n_iter=100,
                  max_path_length=10,
                  learning_rate=0.1,
+                 patience=None,
+                 target_error=None,
                  BaseLearnerClass=DecisionTreeRegressor,
                  kwargs_for_base_learner=None,
                  SelectorClass=DecisionTreeRegressor,
@@ -42,8 +44,13 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                   The maximum length of paths to consider as features. Paths longer
                   than this will not be explored for extending the Extended Boosting Matrix (EBM).
               learning_rate : float, default=0.1
-                  The learning rate shrinks the contribution of each base learner.
+                  The learning_rate shrinks the contribution of each base learner.
                   It is used by the `AdditiveModelWrapper` when fitting each step.
+              patience : int, optional, default=None
+                  Number of iterations with no improvement on the first evaluation set's score
+                  before stopping early. If None, early stopping is not performed.
+                  Requires an `eval_set` to be provided during fitting. The check is performed
+                  based on the Mean Squared Error (MSE) of the first evaluation set in `eval_set`.
               BaseLearnerClass : type, default=sklearn.tree.DecisionTreeRegressor
                   The class of the base learner to be used within each boosting iteration.
                   This class must implement the `BaseLearnerClassInterface`.
@@ -68,6 +75,8 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         """
         self.n_iter = n_iter
         self.max_path_length = max_path_length
+        self.patience = patience
+        self.target_error = target_error
         self.learning_rate = learning_rate
         self.BaseLearnerClass = BaseLearnerClass
         self.verbose = verbose
@@ -77,7 +86,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         self.kwargs_for_selector = kwargs_for_selector
         self.parameters_variable_importance = parameters_variable_importance
 
-    def fit(self, X: list[nx.Graph], y: np.array, list_anchor_nodes_labels: list[tuple], name_of_label_attribute,
+    def fit(self, X: list[nx.Graph], y: np.array, list_anchor_nodes_labels: list[tuple], anchor_nodes_label_name,
             eval_set: list[tuple[list[nx.Graph], Iterable]] = None):
         """
         Fits the SequentialPathBoost model to the training data.
@@ -111,7 +120,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         list_anchor_nodes_labels : list[tuple]
             A list of tuples, where each tuple contains the label(s) identifying
             anchor nodes. These are used to initialize the EBM.
-        name_of_label_attribute : str
+        anchor_nodes_label_name : str
             The name of the node attribute in the graphs that contains the labels
             used to identify anchor nodes and subsequent path elements.
         eval_set : list[tuple[list[nx.Graph], Iterable]], optional, default=None
@@ -127,7 +136,6 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         self._default_kwargs_for_base_learner = {'max_depth': 3,
                                                  'random_state': 0,
                                                  'splitter': 'best',
-                                                 'criterion': "squared_error"
                                                  }
 
         self._default_kwargs_for_selector = {'max_depth': 1,
@@ -137,17 +145,18 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                                              }
 
         self._validate_data(X=X, y=y, list_anchor_nodes_labels=list_anchor_nodes_labels,
-                            name_of_label_attribute=name_of_label_attribute, eval_set=eval_set,
-                            parameters_variable_importance=self.parameters_variable_importance)
+                            name_of_label_attribute=anchor_nodes_label_name, eval_set=eval_set,
+                            parameters_variable_importance=self.parameters_variable_importance,
+                            patience=self.patience)
 
         self.is_fitted_ = True
 
-        self.name_of_label_attribute_ = name_of_label_attribute
+        self.name_of_label_attribute_ = anchor_nodes_label_name
 
         self.paths_selected_by_epb_ = set()
         self._initialize_path_boosting(X=X,
                                        list_anchor_nodes_labels=list_anchor_nodes_labels,
-                                       main_label_name=name_of_label_attribute,
+                                       main_label_name=anchor_nodes_label_name,
                                        eval_set=eval_set)
 
         if self.parameters_variable_importance is not None:
@@ -156,9 +165,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
 
         for n_iteration in range(self.n_iter):
             if self.verbose:
-
                 print("iteration number: ", n_iteration + 1)
-
 
             # this is a parameter used for a check when computing variable importance, to make sure we are computing it on the right iteration, with the right ebm
             self._ebm_has_been_expanded_in_this_iteration = False
@@ -191,16 +198,24 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                                                             iteration_number=n_iteration, gradient=negative_gradient)
 
             # expand the EVAL set in order to contain the selected columns path
-            self._expand_eval_ebm_dataframe_with_best_path(best_path=best_path, main_label_name=name_of_label_attribute,
+            self._expand_eval_ebm_dataframe_with_best_path(best_path=best_path, main_label_name=anchor_nodes_label_name,
                                                            eval_set=eval_set)
 
             self.base_learner_.fit_one_step(X=self.train_ebm_dataframe_, y=y, best_path=best_path,
                                             eval_set=self.eval_set_ebm_df_and_target_)
 
+            if eval_set is not None:
+
+                if self._check_if_stop_early(mse_eval_set=self.base_learner_.eval_sets_mse[0], patience=self.patience,
+                                             target_error=self.target_error):
+                    if self.verbose:
+                        print(
+                            f"Early stopping at iteration {n_iteration + 1} due to no improvement in evaluation set MSE.")
+                        self.n_iter = n_iteration
+                    break
+
             # expand the ebm dataframe with the new columns starting from the selected path
-            self._expand_ebm_dataframe(X=X, selected_path=best_path, main_label_name=name_of_label_attribute)
-
-
+            self._expand_ebm_dataframe(X=X, selected_path=best_path, main_label_name=anchor_nodes_label_name)
 
         self.train_mse_ = self.base_learner_.train_mse
         self.train_mae_ = self.base_learner_.train_mae
@@ -216,6 +231,56 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         self.columns_names_ = self.train_ebm_dataframe_.columns
 
         return self
+
+    def _check_if_stop_early(self, mse_eval_set: list[float], patience: int | None = None,
+                             target_error: float | None = None) -> bool:
+        """
+        Determines whether to stop the training process early based on evaluation metrics.
+
+        Early stopping can be triggered under two conditions:
+        1. If a `target_error` is specified: Training stops if the Mean Squared Error (MSE)
+           on the (first) evaluation set falls at or below this target.
+        2. If `patience` is specified: Training stops if the MSE on the (first) evaluation
+           set has not improved (i.e., decreased) for a consecutive number of iterations
+           equal to `patience`. An "improvement" is defined as the current MSE being strictly
+           less than the MSE `patience` iterations ago. If the MSE remains the same or
+           increases for `patience` iterations, training stops.
+
+        Parameters
+        ----------
+        mse_eval_set : list[float]
+            A list of Mean Squared Errors (MSE) recorded for the first evaluation set
+            at each iteration so far.
+        patience : int or None, optional
+            The number of iterations to wait for an improvement before stopping.
+            If None, this condition for early stopping is disabled.
+        target_error : float or None, optional
+            A specific MSE value. If the evaluation MSE reaches this value or lower,
+            training stops. If None, this condition is disabled.
+
+        Returns
+        -------
+        bool
+            True if the conditions for early stopping are met, False otherwise.
+            Returns False if `patience` is None and `target_error` is None, or if
+            insufficient iterations have passed to evaluate the patience condition.
+        """
+
+        if target_error is not None:
+            # If a target error is specified, check if the last MSE is less than or equal to the target error
+            if mse_eval_set and mse_eval_set[-1] <= target_error:
+                return True
+            else:
+                return False
+
+        if patience is None:
+            return False
+
+        if len(mse_eval_set) < patience:
+            return False
+
+        # Check if the last `patience` MSE values are all greater than or equal to the last MSE value
+        return all(mse >= mse_eval_set[-1] for mse in mse_eval_set[-patience:])
 
     def _expand_eval_ebm_dataframe_with_best_path(self, best_path, main_label_name, eval_set=None):
         # we expand the ebm dataframe ONLY by adding the new columns related to the best path, we are not exploring new paths
@@ -284,7 +349,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
 
         return ebm_dataframe
 
-    def predict(self, X: list[nx.Graph] | None = None, ebm_dataframe: pd.DataFrame | None = None) -> list[
+    def predict(self, X: list[nx.Graph] | nx.Graph | None = None, ebm_dataframe: pd.DataFrame | None = None) -> list[
         numbers.Number]:
         """
         Predicts target values for the given input data.
@@ -316,10 +381,13 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         assert X is not None or ebm_dataframe is not None
         assert self.is_fitted_
         if ebm_dataframe is None:
+            if isinstance(X, nx.Graph):
+                X = [X]
             ebm_dataframe = self.generate_ebm_for_dataset(dataset=X)
         return self.base_learner_.predict(ebm_dataframe)
 
-    def predict_step_by_step(self, X: list[nx.Graph] | None = None, ebm_dataframe: pd.DataFrame | None = None) -> list[
+    def predict_step_by_step(self, X: list[nx.Graph] | nx.Graph | None = None,
+                             ebm_dataframe: pd.DataFrame | None = None) -> list[
         np.array]:
         """
         Generates predictions for each input sample at each boosting iteration.
@@ -356,10 +424,12 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         assert X is not None or ebm_dataframe is not None
         assert self.is_fitted_
         if ebm_dataframe is None:
+            if isinstance(X, nx.Graph):
+                X = [X]
             ebm_dataframe = self.generate_ebm_for_dataset(dataset=X)
         return self.base_learner_.predict_step_by_step(ebm_dataframe)
 
-    def evaluate(self, X: list[nx.Graph] | None = None, y=None, ebm_dataframe: pd.DataFrame | None = None):
+    def evaluate(self, X: list[nx.Graph] | nx.Graph | None = None, y=None, ebm_dataframe: pd.DataFrame | None = None):
         """
         Evaluates the model on the given dataset and returns the Mean Squared Error (MSE) for each iteration.
 
@@ -392,6 +462,8 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         assert X is not None or ebm_dataframe is not None
         assert self.is_fitted_
         if ebm_dataframe is None:
+            if isinstance(X, nx.Graph):
+                X = [X]
             ebm_dataframe = self.generate_ebm_for_dataset(dataset=X)
         return self.base_learner_.evaluate(ebm_dataframe, y)
 
@@ -514,7 +586,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         plot_training_and_eval_errors(learning_rate=self.learning_rate, train_mse=self.train_mse_,
                                       mse_eval_set=eval_sets_mse, skip_first_n_iterations=skip_first_n_iterations)
 
-    def plot_variable_importance(self):
+    def plot_variable_importance(self, top_n_features: int | None = None):
         """
         Plots the computed variable importance scores.
 
@@ -533,4 +605,37 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
             raise ValueError(
                 "Variable importance is not computed. Please set parameters_variable_importance in the constructor.")
         plot_variable_importance_utils(variable_importance=self.variable_importance_,
-                                       parameters_variable_importance=self.parameters_variable_importance)
+                                       parameters_variable_importance=self.parameters_variable_importance,
+                                       top_n=top_n_features)
+
+    def get_mse_for_patience(self, patience: int, eval_set_index: int = 0) -> float:
+        """
+        Returns the Mean Squared Error (MSE) that we would obtain if we stopped training at the specified patience.
+        By default the mse returned is the MSE relative to the first eval_set,
+        """
+        if not hasattr(self, 'fitted_'):
+            raise ValueError("The model has not been fitted yet. Please call fit() before getting MSE for patience.")
+
+        if not hasattr(self, "eval_sets_mse_"):
+            raise ValueError(
+                "The model has not been evaluated on any evaluation set. Please provide an eval_set during fitting.")
+
+        if len(self.eval_sets_mse_) <= eval_set_index:
+            raise ValueError(
+                f"Eval set index {eval_set_index} is out of bounds for the number of evaluation sets: {len(self.eval_sets_mse_)}.")
+        if len(self.eval_sets_mse_[eval_set_index]) < patience:
+            raise ValueError(f"Patience {patience} exceeds the number of training iterations.")
+
+        consecutive_increases = 0
+        last_mse_value = self.eval_sets_mse_[eval_set_index][0]
+        for error in self.eval_sets_mse_[eval_set_index]:
+            if error >= last_mse_value:
+                consecutive_increases += 1
+            else:
+                consecutive_increases = 0
+                last_mse_value = error
+            if consecutive_increases >= patience:
+                return last_mse_value
+
+        # If we never hit the patience condition, return the last MSE value
+        return self.eval_sets_mse_[eval_set_index][-1]

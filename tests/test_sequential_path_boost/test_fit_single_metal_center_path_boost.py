@@ -195,7 +195,7 @@ def test_single_metal_center_path_boost_fit_cop():
 
     # Fit the model on the training data
     booster.fit(X=X_train, y=y_train, eval_set=eval_set, list_anchor_nodes_labels=list_anchor_nodes_labels,
-                name_of_label_attribute="feature_atomic_number")
+                anchor_nodes_label_name="feature_atomic_number")
 
     # Check if the model is fitted
     assert booster.is_fitted_

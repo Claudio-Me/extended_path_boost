@@ -1,4 +1,3 @@
-
 # Extended Path Boost
 
 Extended Path Boost is a Python library for interpretable machine learning on graph-structured data. It implements the PathBoost and SequentialPathBoost algorithms, which iteratively construct features based on paths in graphs and use boosting to build predictive models. The library is designed for tasks where input data consists of collections of graphs (e.g., molecules, social networks) and supports variable importance analysis for interpretability.
@@ -35,50 +34,56 @@ from extended_path_boost.utils.datasets_for_examples.generate_example_dataset im
 
 
 
-
 if __name__ == "__main__":
 
-    list_anchor_nodes_labels = [0, 1, 2, 3]
-    possible_labels = [4, 5, 6, 7, 8, 9]
-
     # Generate synthetic dataset
-    nx_graphs, y, paths, weights = generate_synthetic_graph_dataset(
-        list_anchor_nodes_labels=list_anchor_nodes_labels,
-        possible_labels=possible_labels
-    )
+    nx_graphs, y, true_paths, true_weights = generate_synthetic_graph_dataset()
+
+
+    list_anchor_nodes_labels = [0, 1, 2]
 
     parameters_variable_importance: dict = {
-        'criterion': 'absolute',  # 'absolute' or 'relative'
-        'error_used': 'mse',  # 'mse' or 'mae'
+        'criterion': 'absolute',
+        'error_used': 'mse',
         'use_correlation': False,
         'normalize': True,
     }
 
-    # Split the dataset into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(nx_graphs, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(nx_graphs, y, test_size=0.25, random_state=42)
 
-    # Define evaluation set
     eval_set = [(X_test, y_test)]
 
-    # Fit the model on the training data
     path_boost = PathBoost(
-        n_iter=100,
-        max_path_length=6,
+        n_iter=50, # Reduced for quicker example run
+        max_path_length=5,
         learning_rate=0.1,
-        n_of_cores=1,
+        n_of_cores=1, # Set to >1 for parallel processing if desired
         verbose=True,
         parameters_variable_importance=parameters_variable_importance
     )
+
+    # Fit the model
+    # anchor_nodes_label_name must correspond to the feature storing node types ('feature_0')
     path_boost.fit(
         X=X_train,
         y=y_train,
         eval_set=eval_set,
         list_anchor_nodes_labels=list_anchor_nodes_labels,
-        anchor_nodes_label_name="feature_0"
+        anchor_nodes_label_name="feature_0" # Node types are in 'feature_0'
     )
+    
+    print(f"Generated {len(nx_graphs)} graphs.")
+    print(f"Example y values: {y[:5]}")
+    print(f"True paths definitions: {true_paths}")
+    print(f"True path weights: {true_weights}")
 
-    path_boost.plot_training_and_eval_errors(skip_first_n_iterations=10)
-    path_boost.plot_variable_importance()
+    path_boost.plot_training_and_eval_errors(skip_first_n_iterations=0, plot_eval_sets_error=True)
+    if path_boost.parameters_variable_importance is not None and hasattr(path_boost, 'variable_importance_'):
+        path_boost.plot_variable_importance(top_n_features=10)
+    else:
+        print("Variable importance not computed or available.")
+
+    print("Example run finished.")
 
 ```
 
@@ -92,6 +97,13 @@ if __name__ == "__main__":
 - `evaluate(X, y)`
 - `plot_training_and_eval_errors(skip_first_n_iterations=True)`
 - `plot_variable_importance()`
+- **Attributes:**
+  - `train_mse_`: Training error (MSE) at each iteration
+  - `mse_eval_set_`: Evaluation set error (MSE) at each iteration (if `eval_set` is provided)
+  - `variable_importance_`: Variable/path importance scores (if enabled)
+  - `is_fitted_`: Whether the model is fitted
+  - `models_list_`: List of fitted SequentialPathBoost models (one per anchor node)
+  - (Each SequentialPathBoost in `models_list_` exposes the attributes below)
 
 ### SequentialPathBoost
 
@@ -101,6 +113,15 @@ if __name__ == "__main__":
 - `evaluate(X, y)`
 - `plot_training_and_eval_errors(skip_first_n_iterations=True)`
 - `plot_variable_importance()`
+- **Attributes:**
+  - `train_mse_`: Training error (MSE) at each iteration
+  - `train_mae_`: Training MAE at each iteration
+  - `eval_sets_mse_`: Evaluation set error (MSE) at each iteration (if `eval_set` is provided)
+  - `eval_sets_mae_`: Evaluation set MAE at each iteration (if `eval_set` is provided)
+  - `variable_importance_`: Variable/path importance scores (if enabled)
+  - `paths_selected_by_epb_`: Set of selected paths during boosting
+  - `columns_names_`: Names of EBM columns/features used
+  - `is_fitted_`: Whether the model is fitted
 
 ## Requirements
 
@@ -120,4 +141,3 @@ If you use this library in your research, please cite the corresponding paper (a
 ## License
 
 BSD 3-Clause License
-

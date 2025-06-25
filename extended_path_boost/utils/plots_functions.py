@@ -72,7 +72,7 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
         plt.savefig('training_and_eval_errors.png')
 
 
-def plot_variable_importance_utils(variable_importance: dict, parameters_variable_importance: dict):
+def plot_variable_importance_utils(variable_importance: dict, parameters_variable_importance: dict, top_n: int | None = None):
     """
     Plots the variable importance scores.
 
@@ -94,6 +94,8 @@ def plot_variable_importance_utils(variable_importance: dict, parameters_variabl
     assert isinstance(variable_importance, dict), "Variable importance should be a dictionary."
 
     sorted_items = sorted(variable_importance.items(), key=lambda x: x[1], reverse=True)
+    if top_n is not None:
+        sorted_items = sorted_items[:top_n]
     labels, values = zip(*sorted_items)
 
     # Convert tuples in labels to strings

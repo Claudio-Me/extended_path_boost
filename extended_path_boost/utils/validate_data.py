@@ -138,6 +138,16 @@ def util_validate_data(
             assert isinstance(eval_tuple[1], Iterable) and all(
                 isinstance(item, numbers.Number) for item in eval_tuple[1])
 
+    # check patience
+    patience = check_params.get('patience', None)
+    if patience is not None:
+        assert isinstance(patience, int) and patience >= 0, "patience must be a non-negative integer"
+        if check_params.get('eval_set', None) is None:
+            print("patience is set to None because there is no eval_set provided")
+            patience = None
+    model.patience = patience
+
+
     if not np.array_equal(y, "no_validation"):
         validate_data(model,
                       X="no_validation",

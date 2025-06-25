@@ -88,6 +88,7 @@ class PathBoost(BaseEstimator, RegressorMixin):
         "n_iter": [int],
         "max_path_length": [int],
         "learning_rate": [numbers.Integral, numbers.Real],
+        "target_error": [numbers.Real, None],
         "base_learner_kwargs": [dict, None],
         "BaseLearnerClass": [type],
         "SelectorClass": [type],
@@ -103,6 +104,8 @@ class PathBoost(BaseEstimator, RegressorMixin):
     }
 
     def __init__(self, n_iter=100,
+                 patience: int | None = None,
+                 target_error: float| None = None,
                  max_path_length=10,
                  learning_rate=0.1,
                  m_stops: list[int] = None,
@@ -115,6 +118,8 @@ class PathBoost(BaseEstimator, RegressorMixin):
                  verbose: bool = False, n_of_cores: int = 1):
 
         self.n_iter: int = n_iter
+        self.patience: int = patience
+        self.target_error: float | None = target_error
         self.m_stops: list[int] = m_stops
         self.max_path_length: int = max_path_length
         self.learning_rate: float = learning_rate
@@ -167,7 +172,6 @@ class PathBoost(BaseEstimator, RegressorMixin):
         self : object
             The fitted PathBoost estimator.
         """
-
         self._default_kwargs_for_base_learner = {'max_depth': 3, 'random_state': 0,
                                                  'splitter': 'best', 'criterion': "squared_error"}
 
@@ -177,9 +181,13 @@ class PathBoost(BaseEstimator, RegressorMixin):
         self.anchor_nodes_label_name_ = anchor_nodes_label_name
         self.list_anchor_nodes_labels_ = list_anchor_nodes_labels
 
-        X, y = self._validate_data(X, y, list_anchor_nodes_labels=list_anchor_nodes_labels, eval_set=eval_set,
-                                   m_stops=self.m_stops,
-                                   parameters_variable_importance=self.parameters_variable_importance, )
+        X, y = self._validate_data(X=X, y=y, list_anchor_nodes_labels=list_anchor_nodes_labels, eval_set=eval_set,
+                                   m_stops=self.m_stops, name_of_label_attribute=anchor_nodes_label_name,
+                                   parameters_variable_importance=self.parameters_variable_importance,
+                                   patience=self.patience)
+
+
+
 
         # if variable importance is used, we need all the sub models to not normalize the data and eventually remember to normalize later
         if self.parameters_variable_importance is not None:
@@ -199,6 +207,7 @@ class PathBoost(BaseEstimator, RegressorMixin):
 
         self.models_list_: list[SequentialPathBoost] = []
 
+        m_stops_counter = 0
         # create a train dataset and model
         for i, _ in enumerate(self.list_anchor_nodes_labels_):
             train_indexes = indexes_of_train_graphs_for_each_anchor_label[i]
@@ -207,8 +216,19 @@ class PathBoost(BaseEstimator, RegressorMixin):
             train_datasets_for_each_anchor_label.append(train_dataset)
             train_labels_for_each_anchor_label.append(train_labels)
             if len(train_dataset) != 0:
+                n_iter = self.n_iter
+                # needed to be done to distinguish the case when we are given an m_stops for each anchor node or when we are given a m_stop for each trained model
+                if self.m_stops is not None:
+                    if len(self.m_stops) == len(self.list_anchor_nodes_labels_):
+                        n_iter = self.m_stops[i]
+                    else:
+                        n_iter = self.m_stops[m_stops_counter]
+                        m_stops_counter += 1
+
                 self.models_list_.append(
-                    SequentialPathBoost(n_iter=self.n_iter,
+                    SequentialPathBoost(n_iter=n_iter,
+                                        patience=self.patience,
+                                        target_error=self.target_error,
                                         max_path_length=self.max_path_length,
                                         learning_rate=self.learning_rate,
                                         BaseLearnerClass=self.BaseLearnerClass,
@@ -505,12 +525,13 @@ class PathBoost(BaseEstimator, RegressorMixin):
         plot_training_and_eval_errors(learning_rate=self.learning_rate, train_mse=self.train_mse_,
                                       mse_eval_set=eval_sets_mse, skip_first_n_iterations=skip_first_n_iterations)
 
-    def plot_variable_importance(self):
+    def plot_variable_importance(self, top_n_features: int | None = None):
         if self.parameters_variable_importance is None:
             raise ValueError(
                 "Variable importance is not computed. Please set parameters_variable_importance in the constructor.")
         plot_variable_importance_utils(variable_importance=self.variable_importance_,
-                                       parameters_variable_importance=self.parameters_variable_importance)
+                                       parameters_variable_importance=self.parameters_variable_importance,
+                                       top_n=top_n_features, )
 
     def score(self, X, y, sample_weight=None):
         # This method is used to evaluate the model on the given data.
