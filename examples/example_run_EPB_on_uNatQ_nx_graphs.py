@@ -22,12 +22,12 @@ if __name__ == "__main__":
                            }
 
     # Initialize the PathBoost model
-    path_boost = PathBoost(n_iter=5,
+    path_boost = PathBoost(n_iter=1000,
                            max_path_length=6,
                            learning_rate=0.05,
                            kwargs_for_base_learner=kwargs_for_base_learner,
                            kwargs_for_selector=kwargs_for_selector,
-                           n_of_cores=1,
+                           n_of_cores=10,
                            verbose=True)
 
     # Define anchor nodes labels
@@ -45,4 +45,7 @@ if __name__ == "__main__":
     path_boost.fit(X=X_train, y=y_train, eval_set=eval_set, list_anchor_nodes_labels=list_anchor_nodes_labels,
                    anchor_nodes_label_name="feature_atomic_number")
 
-    path_boost.plot_training_and_eval_errors()
+
+    path_boost.plot_training_and_eval_errors(skip_first_n_iterations=False, save=True, save_path="plots")
+
+    path_boost.plot_variable_importance(top_n_features=20)

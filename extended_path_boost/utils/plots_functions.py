@@ -1,10 +1,12 @@
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
+from datetime import datetime
+import os
 
 
 def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
                                   mse_eval_set: list | None = None, skip_first_n_iterations: int | bool = False,
-                                  show=True, save=False):
+                                  show=True, save=False, save_path: str | None = None):
     """
         Plots the training Mean Squared Error (MSE) and, if given, the MSE for multiple
         evaluation sets over the boosting iterations.
@@ -22,6 +24,13 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
             If True, the first iteration's errors are skipped in the plot (often an outlier).
             If an integer, that many initial iterations are skipped.
             If False or 0, all iterations are plotted.
+        show : bool, default=True
+            If True, the plot is displayed.
+        save : bool, default=False
+            If True, the plot is saved to a file.
+        save_path : str | None, default=None
+            The directory where the plot will be saved. If None, the current
+            working directory is used.
         """
     # skip_the_first n iterations
     if isinstance(skip_first_n_iterations, bool):
@@ -69,7 +78,15 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
         plt.show()
 
     if save:
-        plt.savefig('training_and_eval_errors.png')
+        now = datetime.now()
+        timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f'training_and_eval_errors_{timestamp}.png'
+        if save_path:
+            if not os.path.exists(save_path):
+                os.makedirs(save_path)
+            filename = os.path.join(save_path, filename)
+        plt.savefig(filename)
+        print(f"Plot saved to {filename}")
 
 
 def plot_variable_importance_utils(variable_importance: dict, parameters_variable_importance: dict, top_n: int | None = None):

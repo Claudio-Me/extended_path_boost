@@ -105,7 +105,7 @@ class PathBoost(BaseEstimator, RegressorMixin):
 
     def __init__(self, n_iter=100,
                  patience: int | None = None,
-                 target_error: float| None = None,
+                 target_error: float | None = None,
                  max_path_length=10,
                  learning_rate=0.1,
                  m_stops: list[int] = None,
@@ -185,9 +185,6 @@ class PathBoost(BaseEstimator, RegressorMixin):
                                    m_stops=self.m_stops, name_of_label_attribute=anchor_nodes_label_name,
                                    parameters_variable_importance=self.parameters_variable_importance,
                                    patience=self.patience)
-
-
-
 
         # if variable importance is used, we need all the sub models to not normalize the data and eventually remember to normalize later
         if self.parameters_variable_importance is not None:
@@ -514,7 +511,8 @@ class PathBoost(BaseEstimator, RegressorMixin):
             evolution_mse.append(mse)
         return evolution_mse
 
-    def plot_training_and_eval_errors(self, skip_first_n_iterations: int | bool = True, plot_eval_sets_error=True):
+    def plot_training_and_eval_errors(self, skip_first_n_iterations: int | bool = True, plot_eval_sets_error=True,
+                                      show=True, save=False, save_path: str | None = None):
         """
         Plots the training and evaluation set errors over iterations.
         """
@@ -523,7 +521,8 @@ class PathBoost(BaseEstimator, RegressorMixin):
         else:
             eval_sets_mse = None
         plot_training_and_eval_errors(learning_rate=self.learning_rate, train_mse=self.train_mse_,
-                                      mse_eval_set=eval_sets_mse, skip_first_n_iterations=skip_first_n_iterations)
+                                      mse_eval_set=eval_sets_mse, skip_first_n_iterations=skip_first_n_iterations,
+                                      show=show, save=save, save_path=save_path)
 
     def plot_variable_importance(self, top_n_features: int | None = None):
         if self.parameters_variable_importance is None:

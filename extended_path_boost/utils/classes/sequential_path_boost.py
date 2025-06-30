@@ -555,7 +555,8 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
 
         util_validate_data(model=self, X=X, y=y, **check_params)
 
-    def plot_training_and_eval_errors(self, skip_first_n_iterations=False):
+    def plot_training_and_eval_errors(self, skip_first_n_iterations=False, show=True, save=False,
+                                      save_path: str | None = None):
         """
         Plots the training and evaluation set errors (Mean Squared Error) over iterations.
 
@@ -573,6 +574,13 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
             If False or 0, all iterations' errors are plotted.
             The actual skipping logic is handled by the underlying
             `plot_training_and_eval_errors` utility function.
+        show : bool, default=True
+            If True, the plot is displayed.
+        save : bool, default=False
+            If True, the plot is saved to a file.
+        save_path : str | None, default=None
+            The directory where the plot will be saved. If None, the current
+            working directory is used.
 
         """
         if hasattr(self, 'fitted_'):
@@ -584,7 +592,8 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         else:
             eval_sets_mse = None
         plot_training_and_eval_errors(learning_rate=self.learning_rate, train_mse=self.train_mse_,
-                                      mse_eval_set=eval_sets_mse, skip_first_n_iterations=skip_first_n_iterations)
+                                      mse_eval_set=eval_sets_mse, skip_first_n_iterations=skip_first_n_iterations,
+                                      show=show, save=save, save_path=save_path)
 
     def plot_variable_importance(self, top_n_features: int | None = None):
         """

@@ -33,6 +33,6 @@ if __name__ == "__main__":
 
 
 
-    path_boost.plot_training_and_eval_errors(skip_first_n_iterations=False)
+    path_boost.plot_training_and_eval_errors(skip_first_n_iterations=False, save=True, save_path="plots")
 
-    path_boost.plot_variable_importance(top_n_features=20) 
+    path_boost.plot_variable_importance(top_n_features=20)
