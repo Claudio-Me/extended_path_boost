@@ -74,9 +74,6 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
     # Ensure x-axis only shows integers
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    if show:
-        plt.show()
-
     if save:
         now = datetime.now()
         timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
@@ -88,8 +85,13 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
         plt.savefig(filename)
         print(f"Plot saved to {filename}")
 
+    if show:
+        plt.show()
 
-def plot_variable_importance_utils(variable_importance: dict, parameters_variable_importance: dict, top_n: int | None = None):
+
+
+
+def plot_variable_importance_utils(variable_importance: dict, parameters_variable_importance: dict, top_n: int | None = None, show: bool = True):
     """
     Plots the variable importance scores.
 
@@ -106,10 +108,11 @@ def plot_variable_importance_utils(variable_importance: dict, parameters_variabl
         A dictionary containing parameters that were used for computing
         variable importance (e.g., 'criterion', 'normalize') and potentially
         other parameters to guide the plotting.
+    show : bool, default=True
+        If True, the plot is displayed.
     """
 
     assert isinstance(variable_importance, dict), "Variable importance should be a dictionary."
-
     sorted_items = sorted(variable_importance.items(), key=lambda x: x[1], reverse=True)
     if top_n is not None:
         sorted_items = sorted_items[:top_n]
@@ -124,4 +127,5 @@ def plot_variable_importance_utils(variable_importance: dict, parameters_variabl
     plt.title(parameters_variable_importance['criterion'] + ' Variable Importance')
     plt.gca().invert_yaxis()
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.show()
+    if show:
+        plt.show()

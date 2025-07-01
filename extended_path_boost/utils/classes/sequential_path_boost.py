@@ -595,7 +595,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                                       mse_eval_set=eval_sets_mse, skip_first_n_iterations=skip_first_n_iterations,
                                       show=show, save=save, save_path=save_path)
 
-    def plot_variable_importance(self, top_n_features: int | None = None):
+    def plot_variable_importance(self, top_n_features: int | None = None, show: bool = True):
         """
         Plots the computed variable importance scores.
 
@@ -605,6 +605,8 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         `parameters_variable_importance` was provided at initialization.
         The visual characteristics of the plot are guided by the settings
         contained within `self.parameters_variable_importance`.
+        show : bool, default=True
+            If True, the plot is displayed.
         """
         if hasattr(self, 'fitted_'):
             if not self.fitted_:
@@ -615,7 +617,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                 "Variable importance is not computed. Please set parameters_variable_importance in the constructor.")
         plot_variable_importance_utils(variable_importance=self.variable_importance_,
                                        parameters_variable_importance=self.parameters_variable_importance,
-                                       top_n=top_n_features)
+                                       top_n=top_n_features, show=show)
 
     def get_mse_for_patience(self, patience: int, eval_set_index: int = 0) -> float:
         """

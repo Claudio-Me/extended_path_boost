@@ -524,13 +524,13 @@ class PathBoost(BaseEstimator, RegressorMixin):
                                       mse_eval_set=eval_sets_mse, skip_first_n_iterations=skip_first_n_iterations,
                                       show=show, save=save, save_path=save_path)
 
-    def plot_variable_importance(self, top_n_features: int | None = None):
+    def plot_variable_importance(self, top_n_features: int | None = None, show: bool = True):
         if self.parameters_variable_importance is None:
             raise ValueError(
                 "Variable importance is not computed. Please set parameters_variable_importance in the constructor.")
         plot_variable_importance_utils(variable_importance=self.variable_importance_,
                                        parameters_variable_importance=self.parameters_variable_importance,
-                                       top_n=top_n_features, )
+                                       top_n=top_n_features, show=show)
 
     def score(self, X, y, sample_weight=None):
         # This method is used to evaluate the model on the given data.
