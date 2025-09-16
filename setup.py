@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='Extended_Path_Boost',
-    version='1.2',
+    version='1.4',
     packages=['tests', 'tests.datasets_used_for_tests', 'tests.test_extended_path_boost',
               'tests.test_sequential_path_boost', 'tests.tests_extended_boosting_matrix', 'extended_path_boost',
               'extended_path_boost.utils', 'extended_path_boost.utils.classes',

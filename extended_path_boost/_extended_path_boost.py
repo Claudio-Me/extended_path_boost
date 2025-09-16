@@ -569,6 +569,18 @@ class PathBoost(BaseEstimator, RegressorMixin):
         elif not np.array_equal(y, "no_validation"):
             return y
 
+    def get_final_eval_set_mse(self):
+        """
+        Returns the evaluation set MSE if it was computed during fitting.
+        """
+        if hasattr(self, 'mse_eval_set_'):
+            final_eval_set_mse= []
+            for mse in self.mse_eval_set_:
+                final_eval_set_mse.append(mse[-1])
+            return final_eval_set_mse
+        else:
+            raise AttributeError("Evaluation set MSE is not available. Please fit the model with eval_set.")
+
 
 if __name__ == "__main__":
     from sklearn.utils.estimator_checks import check_estimator

@@ -141,6 +141,7 @@ class ExtendedBoostingMatrix:
                             path=new_path)
                         new_attributes.append(found_attributes)
                         new_labels.append(dataset[graph_number].nodes[new_path[-1]][main_label_name])
+                        pass
 
             graphs_new_attributes[graph_number] = new_attributes
 

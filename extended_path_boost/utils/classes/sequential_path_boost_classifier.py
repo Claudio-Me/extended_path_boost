@@ -15,12 +15,12 @@ from sklearn.base import RegressorMixin
 from .extended_boosting_matrix import ExtendedBoostingMatrix
 from typing import Iterable
 from sklearn.tree import DecisionTreeRegressor, plot_tree
-from .additive_model_wrapper import AdditiveModelWrapper
+from .additive_model_wrapper_classifier import AdditiveModelWrapperClassifier
 from sklearn.metrics import mean_squared_error
 from matplotlib.ticker import MaxNLocator
 
 
-class SequentialPathBoost(BaseEstimator, RegressorMixin):
+class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
     def __init__(self, n_iter=100,
                  max_path_length=10,
                  learning_rate=0.1,
@@ -45,7 +45,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                   than this will not be explored for extending the Extended Boosting Matrix (EBM).
               learning_rate : float, default=0.1
                   The learning_rate shrinks the contribution of each base learner.
-                  It is used by the `AdditiveModelWrapper` when fitting each step.
+                  It is used by the `AdditiveModelWrapperClassifier` when fitting each step.
               patience : int, optional, default=None
                   Number of iterations with no improvement on the first evaluation set's score
                   before stopping early. If None, early stopping is not performed.
@@ -97,7 +97,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
            selector is the original target `y` in the first iteration, and the
            negative gradient of the loss function in subsequent iterations.
         2. It trains a new base learner on the features corresponding to the `best_path`
-           and adds it to the ensemble. The `AdditiveModelWrapper` handles the
+           and adds it to the ensemble. The `AdditiveModelWrapperClassifier` handles the
            fitting of this base learner and updates the cumulative predictions.
         3. It expands the training EBM by generating new path-based features derived
            from extending the `best_path`.
@@ -177,7 +177,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                                                  kwargs_for_selector=self.kwargs_for_selector)
             else:
 
-                negative_gradient = AdditiveModelWrapper._neg_gradient(y=y, y_hat=np.array(
+                negative_gradient = AdditiveModelWrapperClassifier._neg_gradient(y=y, y_hat=np.array(
                     self.base_learner_._last_train_prediction.to_numpy()))
                 best_path = self._find_best_path(train_ebm_dataframe=self.train_ebm_dataframe_,
                                                  y=pd.Series(negative_gradient),
@@ -206,27 +206,27 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
 
             if eval_set is not None:
 
-                if self._check_if_stop_early(mse_eval_set=self.base_learner_.eval_sets_mse[0], patience=self.patience,
+                if self._check_if_stop_early(mse_eval_set=self.base_learner_.eval_sets_logloss[0], patience=self.patience,
                                              target_error=self.target_error):
                     if self.verbose:
                         print(
-                            f"Early stopping at iteration {n_iteration + 1} due to no improvement in evaluation set MSE.")
+                            f"Early stopping at iteration {n_iteration + 1} due to no improvement in evaluation set logloss.")
                         self.n_iter = n_iteration
                     break
 
             # expand the ebm dataframe with the new columns starting from the selected path
             self._expand_ebm_dataframe(X=X, selected_path=best_path, main_label_name=anchor_nodes_label_name)
 
-        self.train_mse_ = self.base_learner_.train_mse
-        self.train_mae_ = self.base_learner_.train_mae
+        self.train_logloss_ = self.base_learner_.train_logloss
+        self.train_accuracy_ = self.base_learner_.train_accuracy
 
         if self.parameters_variable_importance is not None:
             self.variable_importance_: dict = self.class_variable_importance_.compute_variable_importance(
                 path_boost=self)
 
         if eval_set is not None:
-            self.eval_sets_mse_ = self.base_learner_.eval_sets_mse
-            self.eval_sets_mae_ = self.base_learner_.eval_sets_mae
+            self.eval_sets_logloss_ = self.base_learner_.eval_sets_logloss
+            self.eval_sets_accuracy_ = self.base_learner_.eval_sets_accuracy
 
         self.columns_names_ = self.train_ebm_dataframe_.columns
 
@@ -514,7 +514,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                     self.eval_set_ebm_df_and_target_.append([eval_set_ebm_dataframe, y_eval_set])
 
         # initialize base learner wrapper
-        self.base_learner_: AdditiveModelWrapper = AdditiveModelWrapper(BaseModelClass=self.BaseLearnerClass,
+        self.base_learner_: AdditiveModelWrapperClassifier = AdditiveModelWrapperClassifier(BaseModelClass=self.BaseLearnerClass,
                                                                         base_model_class_kwargs=self.kwargs_for_base_learner,
                                                                         learning_rate=self.learning_rate, )
 
@@ -587,12 +587,12 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
             if not self.fitted_:
                 raise ValueError("The model has not been fitted yet. Please call fit() before plotting.")
 
-        if hasattr(self, 'mse_eval_set_'):
-            eval_sets_mse = self.mse_eval_set_
+        if hasattr(self, 'eval_sets_logloss_'):
+            eval_sets_logloss = self.eval_sets_logloss_
         else:
-            eval_sets_mse = None
-        plot_training_and_eval_errors(learning_rate=self.learning_rate, train_mse=self.train_mse_,
-                                      mse_eval_set=eval_sets_mse, skip_first_n_iterations=skip_first_n_iterations,
+            eval_sets_logloss = None
+        plot_training_and_eval_errors(learning_rate=self.learning_rate, train_mse=self.train_logloss_,
+                                      mse_eval_set=eval_sets_logloss, skip_first_n_iterations=skip_first_n_iterations,
                                       show=show, save=save, save_path=save_path)
 
     def plot_variable_importance(self, top_n_features: int | None = None, show: bool = True):
@@ -627,38 +627,38 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         if not hasattr(self, 'fitted_'):
             raise ValueError("The model has not been fitted yet. Please call fit() before getting MSE for patience.")
 
-        if not hasattr(self, "eval_sets_mse_"):
+        if not hasattr(self, "eval_sets_logloss_"):
             raise ValueError(
                 "The model has not been evaluated on any evaluation set. Please provide an eval_set during fitting.")
 
-        if len(self.eval_sets_mse_) <= eval_set_index:
+        if len(self.eval_sets_logloss_) <= eval_set_index:
             raise ValueError(
-                f"Eval set index {eval_set_index} is out of bounds for the number of evaluation sets: {len(self.eval_sets_mse_)}.")
-        if len(self.eval_sets_mse_[eval_set_index]) < patience:
+                f"Eval set index {eval_set_index} is out of bounds for the number of evaluation sets: {len(self.eval_sets_logloss_)}.")
+        if len(self.eval_sets_logloss_[eval_set_index]) < patience:
             raise ValueError(f"Patience {patience} exceeds the number of training iterations.")
 
         consecutive_increases = 0
-        last_mse_value = self.eval_sets_mse_[eval_set_index][0]
-        for error in self.eval_sets_mse_[eval_set_index]:
-            if error >= last_mse_value:
+        last_logloss_value = self.eval_sets_logloss_[eval_set_index][0]
+        for error in self.eval_sets_logloss_[eval_set_index]:
+            if error >= last_logloss_value:
                 consecutive_increases += 1
             else:
                 consecutive_increases = 0
-                last_mse_value = error
+                last_logloss_value = error
             if consecutive_increases >= patience:
-                return last_mse_value
+                return last_logloss_value
 
         # If we never hit the patience condition, return the last MSE value
-        return self.eval_sets_mse_[eval_set_index][-1]
+        return self.eval_sets_logloss_[eval_set_index][-1]
 
     def get_final_eval_set_mse(self):
         """
         Returns the evaluation set MSE if it was computed during fitting.
         """
-        if hasattr(self, 'mse_eval_set_'):
-            final_eval_set_mse= []
-            for mse in self.mse_eval_set_:
-                final_eval_set_mse.append(mse[-1])
-            return final_eval_set_mse
+        if hasattr(self, 'eval_sets_logloss_'):
+            final_eval_set_logloss= []
+            for logloss in self.eval_sets_logloss_:
+                final_eval_set_logloss.append(logloss[-1])
+            return final_eval_set_logloss
         else:
             raise AttributeError("Evaluation set MSE is not available. Please fit the model with eval_set.")

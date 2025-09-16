@@ -7,6 +7,7 @@ from .classes.interfaces.interface_selector import SelectorClassInterface
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.utils.validation import validate_data
 import inspect
+import warnings
 
 def check_interface(class_to_be_checked, interface_class):
     if not issubclass(class_to_be_checked, interface_class):
@@ -84,6 +85,8 @@ def util_validate_data(
     if model.kwargs_for_base_learner is None:
         model.kwargs_for_base_learner = {}
 
+
+
     # check parameters for variable importance
     parameters_variable_importance = check_params.get('parameters_variable_importance', None)
     if parameters_variable_importance is not None:
@@ -118,6 +121,23 @@ def util_validate_data(
                 else:
                     list_anchor_nodes_labels[i] = tuple([list_anchor_nodes_labels[i]])
 
+
+    elif 'list_anchor_nodes_labels' in check_params and list_anchor_nodes_labels is None:
+        # Warn if X is provided but name_of_label_attribute is missing
+        if not(not np.array_equal(X, "no_validation") and "name_of_label_attribute" in check_params):
+            warnings.warn("list_anchor_nodes_labels can not be validated because it is None.")
+        else:
+            anchor_attribute_values = []
+            if not np.array_equal(X, "no_validation") and "name_of_label_attribute" in check_params:
+                label_attr = check_params["name_of_label_attribute"]
+                for graph in X:
+                    for _, node_data in graph.nodes(data=True):
+                        if label_attr in node_data:
+                            anchor_attribute_values.append(node_data[label_attr])
+            model.list_anchor_nodes_labels=  anchor_attribute_values
+
+
+
     model.list_anchor_nodes_labels = list_anchor_nodes_labels
 
     # check m_stops
@@ -146,6 +166,8 @@ def util_validate_data(
             print("patience is set to None because there is no eval_set provided")
             patience = None
     model.patience = patience
+
+
 
 
     if not np.array_equal(y, "no_validation"):

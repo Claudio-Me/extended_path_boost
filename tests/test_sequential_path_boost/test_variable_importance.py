@@ -52,3 +52,4 @@ def test_variable_importance_with_loaded_dataset_relative():
     # Verify variable importance
     assert hasattr(booster, 'variable_importance_'), "Variable importance not stored."
     assert len(booster.variable_importance_) > 0, "Variable importance is empty."
+
