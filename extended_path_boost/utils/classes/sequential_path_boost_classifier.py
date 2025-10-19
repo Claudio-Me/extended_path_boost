@@ -32,7 +32,8 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
                  kwargs_for_selector=None,
                  parameters_variable_importance=None,
                  replace_nan_with=np.nan,
-                 verbose=False):
+                 verbose=False,
+                 use_tree_boost=False):
         """
               Initializes the SequentialPathBoost model.
 
@@ -72,6 +73,10 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
               verbose : bool, default=False
                   If True, prints progress messages during the fitting process, such as the
                   current iteration number and the best path selected.
+              use_tree_boost : bool, default=False
+                  If True, uses the TreeBoost modification in the base learner, optimizing
+                  separate gamma values for each leaf region. This requires the `BaseLearnerClass`
+                  to support this functionality.
         """
         self.n_iter = n_iter
         self.max_path_length = max_path_length
@@ -85,6 +90,7 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
         self.SelectorClass = SelectorClass
         self.kwargs_for_selector = kwargs_for_selector
         self.parameters_variable_importance = parameters_variable_importance
+        self.use_tree_boost = use_tree_boost
 
     def fit(self, X: list[nx.Graph], y: np.array, list_anchor_nodes_labels: list[tuple], anchor_nodes_label_name,
             eval_set: list[tuple[list[nx.Graph], Iterable]] = None):
@@ -206,7 +212,8 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
 
             if eval_set is not None:
 
-                if self._check_if_stop_early(mse_eval_set=self.base_learner_.eval_sets_logloss[0], patience=self.patience,
+                if self._check_if_stop_early(mse_eval_set=self.base_learner_.eval_sets_logloss[0],
+                                             patience=self.patience,
                                              target_error=self.target_error):
                     if self.verbose:
                         print(
@@ -349,7 +356,8 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
 
         return ebm_dataframe
 
-    def predict(self, X: list[nx.Graph] | nx.Graph | None = None, ebm_dataframe: pd.DataFrame | None = None) -> list[
+    def predict(self, X: list[nx.Graph] | nx.Graph | None = None, ebm_dataframe: pd.DataFrame | None = None,
+                class_probability: bool = False) -> list[
         numbers.Number]:
         """
         Predicts target values for the given input data.
@@ -384,10 +392,10 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
             if isinstance(X, nx.Graph):
                 X = [X]
             ebm_dataframe = self.generate_ebm_for_dataset(dataset=X)
-        return self.base_learner_.predict(ebm_dataframe)
+        return self.base_learner_.predict(X=ebm_dataframe, class_probability=class_probability)
 
     def predict_step_by_step(self, X: list[nx.Graph] | nx.Graph | None = None,
-                             ebm_dataframe: pd.DataFrame | None = None) -> list[
+                             ebm_dataframe: pd.DataFrame | None = None, class_probability: bool = False) -> list[
         np.array]:
         """
         Generates predictions for each input sample at each boosting iteration.
@@ -427,7 +435,7 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
             if isinstance(X, nx.Graph):
                 X = [X]
             ebm_dataframe = self.generate_ebm_for_dataset(dataset=X)
-        return self.base_learner_.predict_step_by_step(ebm_dataframe)
+        return self.base_learner_.predict_step_by_step(X=ebm_dataframe, class_probability=class_probability)
 
     def evaluate(self, X: list[nx.Graph] | nx.Graph | None = None, y=None, ebm_dataframe: pd.DataFrame | None = None):
         """
@@ -514,9 +522,10 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
                     self.eval_set_ebm_df_and_target_.append([eval_set_ebm_dataframe, y_eval_set])
 
         # initialize base learner wrapper
-        self.base_learner_: AdditiveModelWrapperClassifier = AdditiveModelWrapperClassifier(BaseModelClass=self.BaseLearnerClass,
-                                                                        base_model_class_kwargs=self.kwargs_for_base_learner,
-                                                                        learning_rate=self.learning_rate, )
+        self.base_learner_: AdditiveModelWrapperClassifier = AdditiveModelWrapperClassifier(
+            BaseModelClass=self.BaseLearnerClass,
+            base_model_class_kwargs=self.kwargs_for_base_learner,
+            learning_rate=self.learning_rate, use_tree_boost=self.use_tree_boost)
 
     @staticmethod
     def _find_best_path(train_ebm_dataframe: pd.DataFrame, y, SelectorClass, kwargs_for_selector) -> tuple[int]:
@@ -656,7 +665,7 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
         Returns the evaluation set MSE if it was computed during fitting.
         """
         if hasattr(self, 'eval_sets_logloss_'):
-            final_eval_set_logloss= []
+            final_eval_set_logloss = []
             for logloss in self.eval_sets_logloss_:
                 final_eval_set_logloss.append(logloss[-1])
             return final_eval_set_logloss

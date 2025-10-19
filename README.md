@@ -15,8 +15,7 @@ Extended Path Boost is a Python library for interpretable machine learning on gr
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/yourusername/Extended_Path_Boost.git
-cd Extended_Path_Boost
+pip install -i https://test.pypi.org/simple/ extended-path-boost
 pip install -r requirements.txt
 ```
 

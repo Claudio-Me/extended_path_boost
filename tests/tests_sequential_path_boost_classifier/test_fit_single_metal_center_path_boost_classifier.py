@@ -160,3 +160,36 @@ def test_single_metal_center_path_boost_classifier_fit_cop():
         common_columns_generated_train_and_eval_ebm].equals(
         ebm_dataframe[common_columns_generated_train_and_eval_ebm])
     assert columns_equal_generated_train_and_eval_ebm
+
+def test_classifier_fit_with_tree_boost_sets_is_fitted(sample_graph_data):
+    X, y, anchor_labels = sample_graph_data
+    model = SequentialPathBoostClassifier(use_tree_boost=True)
+    model.fit(X, y, anchor_labels, "attribute1")
+    assert model.is_fitted_ is True
+
+def test_classifier_fit_with_tree_boost_sets_train_logloss(sample_graph_data):
+    X, y, anchor_labels = sample_graph_data
+    model = SequentialPathBoostClassifier(use_tree_boost=True)
+    model.fit(X, y, anchor_labels, "attribute1")
+    assert hasattr(model, "train_logloss_")
+
+def test_classifier_fit_with_tree_boost_sets_columns_names(sample_graph_data):
+    X, y, anchor_labels = sample_graph_data
+    model = SequentialPathBoostClassifier(use_tree_boost=True)
+    model.fit(X, y, anchor_labels, "attribute1")
+    assert hasattr(model, "columns_names_")
+
+def test_classifier_fit_with_tree_boost_predict(sample_graph_data):
+    X, y, anchor_labels = sample_graph_data
+    model = SequentialPathBoostClassifier(use_tree_boost=True)
+    model.fit(X, y, anchor_labels, "attribute1")
+    preds = model.predict(X)
+    assert len(preds) == len(X)
+    assert set(np.unique(preds)).issubset({0, 1})
+
+def test_classifier_fit_with_tree_boost_eval_set_logloss(sample_graph_data):
+    X, y, anchor_labels = sample_graph_data
+    eval_set = [([X[0]], [y[0]])]
+    model = SequentialPathBoostClassifier(use_tree_boost=True)
+    model.fit(X, y, anchor_labels, "attribute1", eval_set)
+    assert hasattr(model, "eval_sets_logloss_")

@@ -7,14 +7,20 @@ from sklearn.metrics import log_loss, accuracy_score
 from .extended_boosting_matrix import ExtendedBoostingMatrix
 from typing import Iterable
 from .interfaces.interface_base_learner import BaseLearnerClassInterface
+from sklearn.tree import DecisionTreeRegressor
 
 
 class AdditiveModelWrapperClassifier:
-    def __init__(self, BaseModelClass, base_model_class_kwargs, learning_rate: float, ):
+    def __init__(self, BaseModelClass, base_model_class_kwargs, learning_rate: float, use_tree_boost:bool = False):
+
+        self.use_tree_boost = use_tree_boost
+        if self.use_tree_boost:
+            BaseModelClass = BoostedTreeBaselearner
 
         # Ensure BaseModelClass respects BaseLearnerClassInterface
         if not issubclass(BaseModelClass, BaseLearnerClassInterface):
             raise TypeError(f"{BaseModelClass.__name__} must implement BaseLearnerClassInterface")
+
 
         self._last_train_prediction: pd.Series | None = None
 
@@ -74,7 +80,11 @@ class AdditiveModelWrapperClassifier:
             self._target_variable_mean_.append(new_y.mean())
             new_y = new_y - self._target_variable_mean_[-1]
 
-            new_base_learner.fit(restricted_df, new_y)
+            if self.use_tree_boost:
+                new_base_learner.fit(restricted_df, neg_gradient= new_y, current_f=self._last_train_model_output_F.values, y_true=np.array(y))
+            else:
+
+                new_base_learner.fit(restricted_df, new_y)
 
             self.base_learners_list.append(new_base_learner)
             self.considered_columns.append(columns_to_keep)
@@ -144,7 +154,7 @@ class AdditiveModelWrapperClassifier:
 
         return self
 
-    def predict(self, X: pd.DataFrame, class_probability= False, **kwargs):
+    def predict(self, X: pd.DataFrame, class_probability: bool= False, **kwargs):
         predictions = self.predict_step_by_step(X, return_class_probability= class_probability, **kwargs)
         return predictions[-1]
 
@@ -203,8 +213,110 @@ class AdditiveModelWrapperClassifier:
         return y - y_hat
 
 
+class BoostedTreeBaselearner(BaseLearnerClassInterface):
+    def __init__(self, **kwargs):
+        self.model = DecisionTreeRegressor(**kwargs)
+        self.fitted_ = False
+        self.leaf_gammas = {}  # Store optimized gamma for each leaf
 
+    def fit(self, X: pd.DataFrame, neg_gradient: Iterable, current_f: np.ndarray = None,
+            y_true: np.ndarray = None, **kwargs):
+        """
+        Parameters:
+        -----------
+        X : pd.DataFrame
+            Features
+        neg_gradient : Iterable
+            Pseudo-residuals (negative gradient)
+        current_f : np.ndarray
+            Current model predictions (in log-odds space)
+        y_true : np.ndarray
+            True labels in {0, 1} format
+        """
+        # First fit tree to pseudo-residuals
+        self.model.fit(X, neg_gradient)
 
+        # If we have current_f and y_true, optimize gamma for each leaf
+        if current_f is not None and y_true is not None:
+            self._optimize_leaf_gammas(X, y_true, current_f)
+        else:
+            # Fallback: use tree's predictions as-is
+            leaf_indices = self.model.apply(X)
+            unique_leaves = np.unique(leaf_indices)
+            for leaf_id in unique_leaves:
+                mask = (leaf_indices == leaf_id)
+                # Use average of pseudo-residuals in leaf
+                self.leaf_gammas[leaf_id] = self.model.predict(X.iloc[[np.where(mask)[0][0]]])[0]
+
+        self.fitted_ = True
+        return self
+
+    def _optimize_leaf_gammas(self, X: pd.DataFrame, y_true: np.ndarray,
+                              current_f: np.ndarray):
+        """
+        For each leaf, find optimal gamma that minimizes logistic loss
+        Works with y_true in {0, 1}
+        """
+        # Get leaf assignments for all samples
+        leaf_indices = self.model.apply(X)
+        unique_leaves = np.unique(leaf_indices)
+
+        for leaf_id in unique_leaves:
+            # Get samples in this leaf
+            mask = (leaf_indices == leaf_id)
+
+            if np.sum(mask) == 0:
+                self.leaf_gammas[leaf_id] = 0.0
+                continue
+
+            # Get tree's base prediction for this leaf (all same value)
+            X_leaf = X[mask]
+            h_pred_leaf = self.model.predict(X_leaf.iloc[[0]])[0]
+
+            # Get data for this leaf
+            y_leaf = y_true[mask]  # Shape: (n_samples_in_leaf,), values in {0, 1}
+            f_leaf = current_f[mask]  # Shape: (n_samples_in_leaf,), log-odds
+
+            # Optimize gamma for this specific leaf
+            def loss(gamma):
+                f_new = f_leaf + gamma * h_pred_leaf
+                # Binary cross-entropy (logistic loss) for y in {0, 1}:
+                # -[y*log(p) + (1-y)*log(1-p)] where p = sigmoid(f)
+                # Equivalent to: log(1 + exp(-f)) if y=1, log(1 + exp(f)) if y=0
+                # Combined: y*log(1 + exp(-f)) + (1-y)*log(1 + exp(f))
+                p = 1 / (1 + np.exp(-np.clip(f_new, -500, 500)))  # sigmoid
+                return -np.sum(y_leaf * np.log(p + 1e-15) + (1 - y_leaf) * np.log(1 - p + 1e-15))
+
+            # Simple line search
+            best_gamma = 0.0
+            best_loss = loss(0.0)
+
+            # Search in reasonable range
+            for gamma in np.linspace(-10, 10, 100):
+                current_loss = loss(gamma)
+                if current_loss < best_loss:
+                    best_loss = current_loss
+                    best_gamma = gamma
+
+            self.leaf_gammas[leaf_id] = best_gamma
+
+    def predict(self, X: pd.DataFrame, **kwargs):
+        """
+        Predict using optimized gamma values instead of tree's leaf values
+        """
+        if not self.fitted_:
+            raise ValueError("Model not fitted yet")
+
+        # Get leaf assignments
+        leaf_indices = self.model.apply(X)
+
+        # Map each sample to its leaf's optimized gamma
+        predictions = np.array([
+            self.leaf_gammas.get(leaf_id, 0.0)
+            for leaf_id in leaf_indices
+        ])
+
+        return predictions
 
 
 class FirstConstantBaseLearner(BaseLearnerClassInterface):
