@@ -26,6 +26,9 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                  learning_rate=0.1,
                  patience=None,
                  target_error=None,
+                 tol=1e-4,
+                 restore_best_model=True,
+                 learning_rate_scheduler=None,
                  BaseLearnerClass=DecisionTreeRegressor,
                  kwargs_for_base_learner=None,
                  SelectorClass=DecisionTreeRegressor,
@@ -51,6 +54,18 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                   before stopping early. If None, early stopping is not performed.
                   Requires an `eval_set` to be provided during fitting. The check is performed
                   based on the Mean Squared Error (MSE) of the first evaluation set in `eval_set`.
+              tol : float, default=1e-4
+                  Minimum improvement in evaluation MSE required to consider as "improvement".
+                  If the MSE decreases by less than `tol` over `patience` iterations, training stops.
+                  This prevents stopping on insignificant improvements.
+              restore_best_model : bool, default=True
+                  If True and eval_set is provided, the model will be restored to the iteration
+                  with the lowest evaluation MSE after training completes. This prevents returning
+                  an overfit model when early stopping doesn't trigger soon enough.
+              learning_rate_scheduler : callable, optional, default=None
+                  A function that takes `initial_lr` and `iteration` as arguments and returns
+                  the learning rate to use for that iteration. If None, the learning rate is constant.
+                  Built-in schedulers: `exponential_decay_scheduler`, `step_decay_scheduler`, `linear_decay_scheduler`.
               BaseLearnerClass : type, default=sklearn.tree.DecisionTreeRegressor
                   The class of the base learner to be used within each boosting iteration.
                   This class must implement the `BaseLearnerClassInterface`.
@@ -77,6 +92,9 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         self.max_path_length = max_path_length
         self.patience = patience
         self.target_error = target_error
+        self.tol = tol
+        self.restore_best_model = restore_best_model
+        self.learning_rate_scheduler = learning_rate_scheduler
         self.learning_rate = learning_rate
         self.BaseLearnerClass = BaseLearnerClass
         self.verbose = verbose
@@ -189,6 +207,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
 
             # we collect some values for variable importance, important that this operation it is done between the
             # selection of the best path and the expansion of the ebm dataframe
+            #-------------------------------------------------------------------------------------------------
             if self.parameters_variable_importance is not None:
                 if n_iteration == 0:
                     self.class_variable_importance_._update(path_boost=self, selected_path=best_path,
@@ -196,6 +215,8 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                 else:
                     self.class_variable_importance_._update(path_boost=self, selected_path=best_path,
                                                             iteration_number=n_iteration, gradient=negative_gradient)
+
+            #-------------------------------------------------------------------------------------------------
 
             # expand the EVAL set in order to contain the selected columns path
             self._expand_eval_ebm_dataframe_with_best_path(best_path=best_path, main_label_name=anchor_nodes_label_name,
@@ -205,9 +226,16 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                                             eval_set=self.eval_set_ebm_df_and_target_)
 
             if eval_set is not None:
+                # Track best model for potential restoration
+                if len(self.base_learner_.eval_sets_mse) > 0 and len(self.base_learner_.eval_sets_mse[0]) > 0:
+                    current_eval_mse = self.base_learner_.eval_sets_mse[0][-1]
+                    if not hasattr(self, '_best_eval_mse_') or current_eval_mse < self._best_eval_mse_:
+                        self._best_eval_mse_ = current_eval_mse
+                        self._best_iteration_ = n_iteration
+                        self._best_base_learners_count_ = len(self.base_learner_.base_learners_list)
 
                 if self._check_if_stop_early(mse_eval_set=self.base_learner_.eval_sets_mse[0], patience=self.patience,
-                                             target_error=self.target_error):
+                                             target_error=self.target_error, tol=self.tol):
                     if self.verbose:
                         print(
                             f"Early stopping at iteration {n_iteration + 1} due to no improvement in evaluation set MSE.")
@@ -230,10 +258,33 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
 
         self.columns_names_ = self.train_ebm_dataframe_.columns
 
+        # Restore best model if enabled and we have a best iteration
+        if self.restore_best_model and eval_set is not None and hasattr(self, '_best_iteration_'):
+            final_iteration = len(self.base_learner_.base_learners_list) - 1
+            if self._best_iteration_ < final_iteration:
+                # Truncate to best iteration
+                self.base_learner_.base_learners_list = self.base_learner_.base_learners_list[:self._best_base_learners_count_]
+                self.base_learner_.considered_columns = self.base_learner_.considered_columns[:self._best_base_learners_count_]
+                self.base_learner_._target_variable_mean_ = self.base_learner_._target_variable_mean_[:self._best_base_learners_count_]
+                self.base_learner_.train_mse = self.base_learner_.train_mse[:self._best_base_learners_count_]
+                self.base_learner_.train_mae = self.base_learner_.train_mae[:self._best_base_learners_count_]
+                # Also truncate eval set metrics
+                for i in range(len(self.base_learner_.eval_sets_mse)):
+                    self.base_learner_.eval_sets_mse[i] = self.base_learner_.eval_sets_mse[i][:self._best_base_learners_count_]
+                    self.base_learner_.eval_sets_mae[i] = self.base_learner_.eval_sets_mae[i][:self._best_base_learners_count_]
+                # Update the stored metrics
+                self.train_mse_ = self.base_learner_.train_mse
+                self.train_mae_ = self.base_learner_.train_mae
+                self.eval_sets_mse_ = self.base_learner_.eval_sets_mse
+                self.eval_sets_mae_ = self.base_learner_.eval_sets_mae
+
+                if self.verbose:
+                    print(f"Restored model to best iteration {self._best_iteration_ + 1} with eval MSE {self._best_eval_mse_:.6f}")
+
         return self
 
     def _check_if_stop_early(self, mse_eval_set: list[float], patience: int | None = None,
-                             target_error: float | None = None) -> bool:
+                             target_error: float | None = None, tol: float = 1e-4) -> bool:
         """
         Determines whether to stop the training process early based on evaluation metrics.
 
@@ -241,10 +292,8 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         1. If a `target_error` is specified: Training stops if the Mean Squared Error (MSE)
            on the (first) evaluation set falls at or below this target.
         2. If `patience` is specified: Training stops if the MSE on the (first) evaluation
-           set has not improved (i.e., decreased) for a consecutive number of iterations
-           equal to `patience`. An "improvement" is defined as the current MSE being strictly
-           less than the MSE `patience` iterations ago. If the MSE remains the same or
-           increases for `patience` iterations, training stops.
+           set has not improved by at least `tol` over `patience` iterations. This prevents
+           stopping on insignificant improvements.
 
         Parameters
         ----------
@@ -257,6 +306,9 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         target_error : float or None, optional
             A specific MSE value. If the evaluation MSE reaches this value or lower,
             training stops. If None, this condition is disabled.
+        tol : float, default=1e-4
+            Minimum improvement required to consider as "improvement".
+            If MSE decreases by less than tol, it's not considered an improvement.
 
         Returns
         -------
@@ -279,8 +331,14 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         if len(mse_eval_set) < patience:
             return False
 
-        # Check if the last `patience` MSE values are all greater than or equal to the last MSE value
-        return all(mse >= mse_eval_set[-1] for mse in mse_eval_set[-patience:])
+        # Check if improvement over `patience` iterations is below tolerance
+        # Compare current MSE to MSE from `patience` iterations ago
+        old_mse = mse_eval_set[-patience]
+        current_mse = mse_eval_set[-1]
+        improvement = old_mse - current_mse
+
+        # Stop if no significant improvement
+        return improvement < tol
 
     def _expand_eval_ebm_dataframe_with_best_path(self, best_path, main_label_name, eval_set=None):
         # we expand the ebm dataframe ONLY by adding the new columns related to the best path, we are not exploring new paths
@@ -516,7 +574,8 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
         # initialize base learner wrapper
         self.base_learner_: AdditiveModelWrapper = AdditiveModelWrapper(BaseModelClass=self.BaseLearnerClass,
                                                                         base_model_class_kwargs=self.kwargs_for_base_learner,
-                                                                        learning_rate=self.learning_rate, )
+                                                                        learning_rate=self.learning_rate,
+                                                                        learning_rate_scheduler=self.learning_rate_scheduler)
 
     @staticmethod
     def _find_best_path(train_ebm_dataframe: pd.DataFrame, y, SelectorClass, kwargs_for_selector) -> tuple[int]:

@@ -10,8 +10,23 @@ from .interfaces.interface_base_learner import BaseLearnerClassInterface
 
 
 class AdditiveModelWrapper:
-    def __init__(self, BaseModelClass, base_model_class_kwargs, learning_rate: float, ):
+    def __init__(self, BaseModelClass, base_model_class_kwargs, learning_rate: float,
+                 learning_rate_scheduler: callable = None):
+        """
+        Initialize the AdditiveModelWrapper.
 
+        Parameters
+        ----------
+        BaseModelClass : type
+            The class of the base learner to use.
+        base_model_class_kwargs : dict
+            Keyword arguments to pass to the base learner constructor.
+        learning_rate : float
+            The initial learning rate.
+        learning_rate_scheduler : callable, optional
+            A function that takes `initial_lr` and `iteration` as arguments and returns
+            the learning rate to use for that iteration. If None, learning rate is constant.
+        """
         # Ensure BaseModelClass respects BaseLearnerClassInterface
         if not issubclass(BaseModelClass, BaseLearnerClassInterface):
             raise TypeError(f"{BaseModelClass.__name__} must implement BaseLearnerClassInterface")
@@ -23,6 +38,8 @@ class AdditiveModelWrapper:
         self.eval_sets_mse: list[list[float]] = []
         self.eval_sets_mae: list[list[float]] = []
         self.learning_rate = learning_rate
+        self._initial_learning_rate = learning_rate
+        self.learning_rate_scheduler = learning_rate_scheduler
         self.base_learners_list: list = []
         self.considered_columns = []
         self.BaseModelClass = BaseModelClass
@@ -30,6 +47,14 @@ class AdditiveModelWrapper:
 
     def fit_one_step(self, X: pd.DataFrame, y, best_path, eval_set=None, negative_gradient=None):
         # it fits one step of the boosting
+
+        # Apply learning rate scheduler if provided
+        if self.learning_rate_scheduler is not None:
+            iteration = len(self.base_learners_list)
+            self.learning_rate = self.learning_rate_scheduler(
+                initial_lr=self._initial_learning_rate,
+                iteration=iteration
+            )
 
         columns_to_keep = ExtendedBoostingMatrix.get_columns_related_to_path(best_path, X.columns)
         restricted_df = X[columns_to_keep]
@@ -160,3 +185,78 @@ class AdditiveModelWrapper:
     @staticmethod
     def _neg_gradient(y, y_hat):
         return y - y_hat
+
+
+# Learning rate schedulers
+def exponential_decay_scheduler(initial_lr: float, iteration: int, decay_rate: float = 0.95) -> float:
+    """
+    Exponential decay learning rate scheduler.
+
+    lr = initial_lr * decay_rate^iteration
+
+    Parameters
+    ----------
+    initial_lr : float
+        The initial learning rate.
+    iteration : int
+        The current iteration number (0-indexed).
+    decay_rate : float, default=0.95
+        The decay rate per iteration.
+
+    Returns
+    -------
+    float
+        The learning rate for this iteration.
+    """
+    return initial_lr * (decay_rate ** iteration)
+
+
+def step_decay_scheduler(initial_lr: float, iteration: int, drop_every: int = 10, drop_factor: float = 0.5) -> float:
+    """
+    Step decay learning rate scheduler.
+
+    Learning rate drops by drop_factor every drop_every iterations.
+
+    Parameters
+    ----------
+    initial_lr : float
+        The initial learning rate.
+    iteration : int
+        The current iteration number (0-indexed).
+    drop_every : int, default=10
+        Number of iterations between drops.
+    drop_factor : float, default=0.5
+        Factor by which to multiply the learning rate at each drop.
+
+    Returns
+    -------
+    float
+        The learning rate for this iteration.
+    """
+    return initial_lr * (drop_factor ** (iteration // drop_every))
+
+
+def linear_decay_scheduler(initial_lr: float, iteration: int, total_iterations: int = 100, min_lr: float = 0.01) -> float:
+    """
+    Linear decay learning rate scheduler.
+
+    Learning rate decays linearly from initial_lr to min_lr over total_iterations.
+
+    Parameters
+    ----------
+    initial_lr : float
+        The initial learning rate.
+    iteration : int
+        The current iteration number (0-indexed).
+    total_iterations : int, default=100
+        Total number of iterations over which to decay.
+    min_lr : float, default=0.01
+        Minimum learning rate.
+
+    Returns
+    -------
+    float
+        The learning rate for this iteration.
+    """
+    decay = (initial_lr - min_lr) / total_iterations
+    return max(min_lr, initial_lr - decay * iteration)

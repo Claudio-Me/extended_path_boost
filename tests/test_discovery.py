@@ -8,10 +8,10 @@ from extended_path_boost.utils.discovery import all_displays, all_estimators, al
 
 def test_all_estimators():
     estimators = all_estimators()
-    assert len(estimators) == 4
+    assert len(estimators) == 5
 
     estimators = all_estimators(type_filter="regressor")
-    assert len(estimators) == 3
+    assert len(estimators) == 4
 
     estimators = all_estimators(type_filter=["classifier", "transformer"])
     assert len(estimators) == 0
@@ -28,4 +28,4 @@ def test_all_displays():
 
 def test_all_functions():
     functions = all_functions()
-    assert len(functions) == 14
+    assert len(functions) == 16  # includes scheduler functions

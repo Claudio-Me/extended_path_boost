@@ -56,4 +56,3 @@ def test_single_metal_center_path_boost_classifier_evaluate():
     evaluation = model.evaluate(X, y)
     assert isinstance(evaluation, list)
     assert len(evaluation) > 0
-

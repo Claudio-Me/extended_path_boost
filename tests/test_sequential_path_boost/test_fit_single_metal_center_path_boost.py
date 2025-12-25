@@ -248,3 +248,97 @@ def test_single_metal_center_path_boost_fit_cop():
         ebm_dataframe[common_columns_generated_train_and_eval_ebm])
 
     assert columns_equal_generated_train_and_eval_ebm
+
+
+def test_training_error_is_monotonically_decreasing():
+    """Test that training MSE is monotonically decreasing with respect to the number of iterations.
+
+    This is a fundamental property of gradient boosting algorithms: each iteration should
+    reduce (or at least not increase) the training error.
+    """
+    # Load the dataset
+    nx_graphs = get_nx_test_dataset()
+    y = get_y()
+
+    # Split the dataset into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(nx_graphs, y, test_size=0.4, random_state=42)
+
+    # Initialize the booster with sufficient iterations
+    n_iterations = 30
+    booster = SequentialPathBoost(n_iter=n_iterations, max_path_length=3, learning_rate=0.5)
+
+    # Define anchor nodes labels
+    list_anchor_nodes_labels = [25, 47, 48, 80]
+
+    # Fit the model on the training data
+    booster.fit(X=X_train, y=y_train, list_anchor_nodes_labels=list_anchor_nodes_labels,
+                anchor_nodes_label_name="feature_atomic_number")
+
+    # Verify that train_mse_ exists and has the correct length
+    assert hasattr(booster, "train_mse_"), "Model should have train_mse_ attribute after fitting"
+    assert len(booster.train_mse_) == n_iterations, f"Expected {n_iterations} MSE values, got {len(booster.train_mse_)}"
+
+    # Check that training MSE is monotonically decreasing (non-increasing)
+    # Use a small tolerance to account for floating-point precision issues
+    tolerance = 1e-9
+    for i in range(1, len(booster.train_mse_)):
+        assert booster.train_mse_[i] <= booster.train_mse_[i - 1] + tolerance, (
+            f"Training MSE should be monotonically decreasing, but MSE at iteration {i} "
+            f"({booster.train_mse_[i]}) is greater than MSE at iteration {i - 1} "
+            f"({booster.train_mse_[i - 1]})"
+        )
+
+
+def test_training_error_is_monotonically_decreasing_synthetic_data():
+    """Test that training MSE is monotonically decreasing using synthetic graph data.
+
+    This test uses a larger synthetic dataset to ensure robust testing of the
+    monotonicity property. With very small datasets (e.g., 2 samples), gradient
+    boosting can exhibit edge-case behavior.
+    """
+    np.random.seed(42)
+
+    # Create a synthetic dataset with enough samples for stable gradient boosting
+    n_samples = 20
+    graphs = []
+    targets = []
+
+    for i in range(n_samples):
+        G = nx.Graph()
+        # Create a simple graph with varying attributes
+        target_value = 50 + i * 5 + np.random.normal(0, 2)
+        G.add_nodes_from([
+            (1, {"label": 1, "node_attr": 10 + i}),
+            (2, {"label": 2, "node_attr": 20 + i}),
+            (3, {"label": 3, "node_attr": 30 + i}),
+        ])
+        G.add_edges_from([
+            (1, 2, {"edge_attr": target_value * 0.5}),
+            (2, 3, {"edge_attr": target_value * 0.3}),
+        ])
+        graphs.append(G)
+        targets.append(target_value)
+
+    X = graphs
+    y = np.array(targets)
+    anchor_labels = [(1,)]
+
+    # Initialize the booster
+    n_iterations = 20
+    booster = SequentialPathBoost(n_iter=n_iterations, max_path_length=3, learning_rate=0.3)
+
+    # Fit the model
+    booster.fit(X, y, anchor_labels, "label")
+
+    # Verify that train_mse_ exists
+    assert hasattr(booster, "train_mse_"), "Model should have train_mse_ attribute after fitting"
+
+    # Check that training MSE is monotonically decreasing (non-increasing)
+    tolerance = 1e-9
+    for i in range(1, len(booster.train_mse_)):
+        assert booster.train_mse_[i] <= booster.train_mse_[i - 1] + tolerance, (
+            f"Training MSE should be monotonically decreasing, but MSE at iteration {i} "
+            f"({booster.train_mse_[i]}) is greater than MSE at iteration {i - 1} "
+            f"({booster.train_mse_[i - 1]})"
+        )
+
