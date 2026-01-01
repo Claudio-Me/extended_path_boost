@@ -85,8 +85,8 @@ class PathBoost(BaseEstimator, RegressorMixin):
     # This is a dictionary allowing to define the type of parameters.
     # It used to validate parameter within the `_fit_context` decorator.
     _parameter_constraints = {
-        "n_iter": [int],
-        "max_path_length": [int],
+        "n_iter": [numbers.Integral],
+        "max_path_length": [numbers.Integral],
         "learning_rate": [numbers.Integral, numbers.Real],
         "target_error": [numbers.Real, None],
         "base_learner_kwargs": [dict, None],
@@ -99,7 +99,7 @@ class PathBoost(BaseEstimator, RegressorMixin):
         "y": [Iterable],
         "anchor_nodes_label_name": [str],
         "verbose": [bool],
-        "n_of_cores": [int],
+        "n_of_cores": [numbers.Integral],
         "parameters_variable_importance": [dict, None]
     }
 
