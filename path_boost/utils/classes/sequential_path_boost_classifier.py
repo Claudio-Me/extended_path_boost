@@ -143,6 +143,14 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
             The fitted SequentialPathBoost estimator.
         """
 
+        # Configure logging based on verbose flag
+        if self.verbose:
+            logging.getLogger('path_boost').setLevel(logging.INFO)
+            if not logging.getLogger('path_boost').handlers:
+                handler = logging.StreamHandler()
+                handler.setFormatter(logging.Formatter('%(message)s'))
+                logging.getLogger('path_boost').addHandler(handler)
+
         self._default_kwargs_for_base_learner = {'max_depth': 3,
                                                  'random_state': 0,
                                                  'splitter': 'best',
@@ -195,7 +203,7 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
                                                  kwargs_for_selector=self.kwargs_for_selector)
 
             if self.verbose:
-                print("Best path: ", best_path)
+                logger.info(f"Best path: {best_path}")
 
             # we collect some values for variable importance, important that this operation it is done between the
             # selection of the best path and the expansion of the ebm dataframe
@@ -220,7 +228,7 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
                                              patience=self.patience,
                                              target_error=self.target_error):
                     if self.verbose:
-                        print(
+                        logger.info(
                             f"Early stopping at iteration {n_iteration + 1} due to no improvement in evaluation set logloss.")
                         self.n_iter = n_iteration
                     break

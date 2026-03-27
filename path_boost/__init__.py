@@ -1,5 +1,7 @@
 # Authors: scikit-learn-contrib developers
-# License: BSD 3 clause
+# License: MIT
+
+import logging
 
 from ._path_boost import PathBoost
 from .utils.classes.sequential_path_boost import SequentialPathBoost

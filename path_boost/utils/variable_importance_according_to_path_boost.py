@@ -1,3 +1,4 @@
+import logging
 import warnings
 from typing import TYPE_CHECKING
 
@@ -6,6 +7,8 @@ if TYPE_CHECKING:
 
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger('path_boost')
 from collections import defaultdict
 from .classes.extended_boosting_matrix import ExtendedBoostingMatrix
 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -82,15 +85,15 @@ class VariableImportance_ForSequentialPathBoost:
                 if self.error_used == 'mse':
                     improvement = path_boost.train_mse_[iteration - 1] - path_boost.train_mse_[iteration]
                     if improvement < 0 and previous_improvement > 0:
-                        print(
+                        logger.debug(
                             f"error improvement between iteration {iteration} and {iteration - 1} is negative ({improvement}). This is expected by the algorithm, but it might be a sign of overfitting even if we are comparing the improvement on the train error")
                     error_improvement[path] += improvement
 
                 elif self.error_used == 'mae':
                     improvement = path_boost.train_mae_[iteration - 1] - path_boost.train_mae_[iteration]
                     if improvement < 0 and previous_improvement > 0:
-                        print(
-                            f"error improvement between iteration {iteration} and {iteration - 1} is negative. This is expected in by the algorithm, but it might be a sign of overfitting even tho we are comparing the improvement on the train error")
+                        logger.debug(
+                            f"error improvement between iteration {iteration} and {iteration - 1} is negative. This is expected by the algorithm, but it might be a sign of overfitting even if we are comparing the improvement on the train error")
                     error_improvement[path] += improvement
                 previous_improvement = improvement
 

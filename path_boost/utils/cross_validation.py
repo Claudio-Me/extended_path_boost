@@ -1,8 +1,12 @@
+import logging
+
 import networkx as nx
 import numpy as np
 from sklearn.model_selection import GridSearchCV, train_test_split
+
 from path_boost._path_boost import PathBoost
-from sklearn.model_selection import train_test_split
+
+logger = logging.getLogger('path_boost')
 
 
 def independent_cross_validation_on_each_anchor_node(X: list[nx.Graph], y, param_grid: dict = None):
@@ -25,11 +29,10 @@ def independent_cross_validation_on_each_anchor_node(X: list[nx.Graph], y, param
     grid_search.fit(X_train, y_train, list_anchor_nodes_labels=[25, 47, 48, 80],
                     anchor_nodes_label_name="feature_atomic_number")
 
-    # Print the best parameters and the best score
-    print("Best parameters found: ", grid_search.best_params_)
-    print("Best cross-validation score: ", -grid_search.best_score_)
+    logger.info(f"Best parameters found: {grid_search.best_params_}")
+    logger.info(f"Best cross-validation score: {-grid_search.best_score_}")
 
     # Evaluate the best model on the test set
     best_model = grid_search.best_estimator_
     test_score = best_model.score(X_test, y_test)
-    print("Test set score: ", test_score)
+    logger.info(f"Test set score: {test_score}")

@@ -1,13 +1,18 @@
+import inspect
+import logging
 import numbers
+import warnings
+from typing import Iterable
+
 import networkx as nx
 import numpy as np
-from typing import Iterable
-from .classes.interfaces.interface_base_learner import BaseLearnerClassInterface
-from .classes.interfaces.interface_selector import SelectorClassInterface
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.utils.validation import validate_data
-import inspect
-import warnings
+
+from .classes.interfaces.interface_base_learner import BaseLearnerClassInterface
+from .classes.interfaces.interface_selector import SelectorClassInterface
+
+logger = logging.getLogger('path_boost')
 
 def check_interface(class_to_be_checked, interface_class):
     if not issubclass(class_to_be_checked, interface_class):
@@ -163,7 +168,7 @@ def util_validate_data(
     if patience is not None:
         assert isinstance(patience, int) and patience >= 0, "patience must be a non-negative integer"
         if check_params.get('eval_set', None) is None:
-            print("patience is set to None because there is no eval_set provided")
+            warnings.warn("patience is set to None because there is no eval_set provided")
             patience = None
     model.patience = patience
 

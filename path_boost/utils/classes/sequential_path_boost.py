@@ -210,6 +210,14 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
             The fitted SequentialPathBoost estimator.
         """
 
+        # Configure logging based on verbose flag
+        if self.verbose:
+            logging.getLogger('path_boost').setLevel(logging.INFO)
+            if not logging.getLogger('path_boost').handlers:
+                handler = logging.StreamHandler()
+                handler.setFormatter(logging.Formatter('%(message)s'))
+                logging.getLogger('path_boost').addHandler(handler)
+
         self._default_kwargs_for_base_learner = {'max_depth': 3,
                                                  'random_state': 0,
                                                  'splitter': 'best',

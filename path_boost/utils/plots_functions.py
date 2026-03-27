@@ -1,7 +1,11 @@
+import logging
+import os
+from datetime import datetime
+
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
-from datetime import datetime
-import os
+
+logger = logging.getLogger('path_boost')
 
 
 def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
@@ -83,7 +87,7 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
                 os.makedirs(save_path)
             filename = os.path.join(save_path, filename)
         plt.savefig(filename)
-        print(f"Plot saved to {filename}")
+        logger.info(f"Plot saved to {filename}")
 
     if show:
         plt.show()
