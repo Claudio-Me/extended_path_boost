@@ -1,4 +1,4 @@
-from extended_path_boost._extended_path_boost import PathBoost
+from path_boost._path_boost import PathBoost
 from sklearn.model_selection import train_test_split
 from torch_geometric.datasets import TUDataset
 from torch_geometric.utils import to_networkx

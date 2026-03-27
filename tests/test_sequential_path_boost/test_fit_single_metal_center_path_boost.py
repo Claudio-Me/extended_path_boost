@@ -2,7 +2,7 @@ import networkx as nx
 import numpy as np
 import pytest
 from sklearn.model_selection import train_test_split
-from extended_path_boost.utils.classes.sequential_path_boost import SequentialPathBoost
+from path_boost.utils.classes.sequential_path_boost import SequentialPathBoost
 from tests.datasets_used_for_tests.load_test_dataset import get_nx_test_dataset, get_y
 
 

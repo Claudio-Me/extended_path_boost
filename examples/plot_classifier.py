@@ -3,12 +3,12 @@
 Plotting Template Classifier
 ============================
 
-An example plot of :class:`extended_path_boost.template.TemplateClassifier`
+An example plot of :class:`path_boost.template.TemplateClassifier`
 """
 
 # %%
 # Train our classifier on very simple dataset
-from extended_path_boost import TemplateClassifier
+from path_boost import TemplateClassifier
 
 X = [[0, 0], [1, 1]]
 y = [0, 1]

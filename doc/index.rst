@@ -1,4 +1,4 @@
-.. extended_path_boost documentation master file, created by
+.. path_boost documentation master file, created by
    sphinx-quickstart on Mon Jan 18 14:44:12 2016.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
@@ -12,10 +12,10 @@ Project template for `scikit-learn` extension
 **Date**: |today| **Version**: |version|
 
 **Useful links**:
-`Source Repository <https://github.com/scikit-learn-contrib/extended_path_boost>`__ |
-`Issues & Ideas <https://github.com/scikit-learn-contrib/extended_path_boostk/issues>`__ |
+`Source Repository <https://github.com/scikit-learn-contrib/path_boost>`__ |
+`Issues & Ideas <https://github.com/scikit-learn-contrib/path_boostk/issues>`__ |
 
-This is the documentation for the `extended_path_boost` to help at extending
+This is the documentation for the `path_boost` to help at extending
 `scikit-learn`. It provides some information on how to build your own custom
 `scikit-learn` compatible estimators as well as a template to package them.
 

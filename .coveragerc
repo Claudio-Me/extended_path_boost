@@ -2,5 +2,5 @@
 
 [run]
 branch = True
-source = extended_path_boost
-include = */extended_path_boost/*
+source = path_boost
+include = */path_boost/*

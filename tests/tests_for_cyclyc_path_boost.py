@@ -7,7 +7,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import pickle
 import os
-from extended_path_boost import PathBoost
+from path_boost import PathBoost
 
 
 # Authors: scikit-learn-contrib developers

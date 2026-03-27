@@ -1,17 +1,11 @@
-import numpy as np
-import pandas as pd
-from matplotlib.font_manager import list_fonts
-
-from pandas.core.interchange import dataframe
+import ast
+import numbers
+from collections import defaultdict
 from typing import Iterable
 
 import networkx as nx
-from collections import defaultdict
-import matplotlib.pyplot as plt
-import ast
-import numbers
-import copy
-import ast
+import numpy as np
+import pandas as pd
 
 
 class ExtendedBoostingMatrix:

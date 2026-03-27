@@ -27,7 +27,7 @@ except ImportError:
     TQDM_AVAILABLE = False
 
 # Set up logger for the module
-logger = logging.getLogger('extended_path_boost')
+logger = logging.getLogger('path_boost')
 
 # Type aliases
 GraphList = List[nx.Graph]

@@ -1,7 +1,7 @@
 import networkx as nx
 import pandas as pd
 import pytest
-from extended_path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
+from path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
 import numpy as np
 
 @pytest.fixture

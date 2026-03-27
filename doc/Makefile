@@ -1,4 +1,4 @@
-extended_path_boost# Makefile for Sphinx documentation
+path_boost# Makefile for Sphinx documentation
 #
 
 # You can set these variables from the command line.
@@ -92,17 +92,17 @@ qthelp:
 	@echo
 	@echo "Build finished; now you can run "qcollectiongenerator" with the" \
 	      ".qhcp project file in $(BUILDDIR)/qthelp, like this:"
-	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/extended_path_boost.qhcp"
+	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/path_boost.qhcp"
 	@echo "To view the help file:"
-	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/extended_path_boost.qhc"
+	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/path_boost.qhc"
 
 devhelp:
 	$(SPHINXBUILD) -b devhelp $(ALLSPHINXOPTS) $(BUILDDIR)/devhelp
 	@echo
 	@echo "Build finished."
 	@echo "To view the help file:"
-	@echo "# mkdir -p $$HOME/.local/share/devhelp/extended_path_boost"
-	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/extended_path_boost"
+	@echo "# mkdir -p $$HOME/.local/share/devhelp/path_boost"
+	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/path_boost"
 	@echo "# devhelp"
 
 epub:

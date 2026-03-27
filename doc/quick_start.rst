@@ -26,7 +26,7 @@ occurrences using the following command:
 
 .. prompt:: bash $
 
-  git grep extended_path_boost
+  git grep path_boost
   git grep sklearn-template
   git grep project-template
 
@@ -149,7 +149,7 @@ tests, and build the documentation. So for instance, you can run the tests with:
 
 .. prompt:: bash $
 
-  pytest -vsl extended_path_boost
+  pytest -vsl path_boost
 
 In this case, you can even use pre-commit before using git. You will need to initialize
 it with:

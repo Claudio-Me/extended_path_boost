@@ -1,7 +1,7 @@
 import numpy as np
 import networkx as nx
 from sklearn.model_selection import train_test_split, GridSearchCV
-from extended_path_boost._extended_path_boost import PathBoost
+from path_boost._path_boost import PathBoost
 
 
 def _find_path_instances(graph, path_definition, type_attribute_name='feature_0'):

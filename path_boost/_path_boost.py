@@ -54,7 +54,7 @@ except ImportError:
     TQDM_AVAILABLE = False
 
 # Set up logger for the module
-logger = logging.getLogger('extended_path_boost')
+logger = logging.getLogger('path_boost')
 
 
 class PathBoost(BaseEstimator, RegressorMixin):
@@ -395,7 +395,6 @@ class PathBoost(BaseEstimator, RegressorMixin):
             map(list, itertools.zip_longest(*predictions_for_each_anchor_node_padded_with_none, fillvalue=None)))
 
         # Calculate the average of each row, ignoring None values
-        # predictions = [np.mean([x for x in sublist if x is not None]) for sublist in transposed_list]
         predictions = []
         for sublist in transposed_list:
             if len(sublist) > 0:
@@ -408,7 +407,6 @@ class PathBoost(BaseEstimator, RegressorMixin):
                 avg = 0
             predictions.append(avg)
 
-        # predictions = [np.mean([x for x in sublist if x is not None]) if len(sublist) > 0 else 0 for sublist in transposed_list]
         predictions = [x if x is not None and not np.isnan(x) else 0 for x in predictions]
 
         return predictions
@@ -513,7 +511,6 @@ class PathBoost(BaseEstimator, RegressorMixin):
                 else:
                     avg = 0
                 averages.append(avg)
-            # averages = [np.mean([x for x in sublist if x is not None]) if len(sublist) > 0 else 0 for sublist in transposed_iteration_predictions[iteration]]
             averages = [x if x is not None and not np.isnan(x) else 0 for x in averages]
             predictions_step_by_step.append(averages)
 
@@ -578,7 +575,6 @@ class PathBoost(BaseEstimator, RegressorMixin):
         # - evaluate the model on the given data
         # - return the score
         mse_evolution = self.evaluate(X=X, y=y)
-        # best_mse = min(mse_evolution)
         best_mse = mse_evolution[-1]
         return - best_mse
 

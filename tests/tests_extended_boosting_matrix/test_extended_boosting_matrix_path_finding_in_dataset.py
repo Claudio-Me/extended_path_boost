@@ -1,8 +1,8 @@
-# File: extended_path_boost/utils/tests/test_extended_boosting_matrix_path_finding_in_dataset.py
+# File: path_boost/utils/tests/test_extended_boosting_matrix_path_finding_in_dataset.py
 
 import networkx as nx
 import pytest
-from extended_path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
+from path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
 
 
 def test_find_paths_in_dataset_single_graph_single_path():

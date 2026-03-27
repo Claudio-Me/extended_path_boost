@@ -3,12 +3,12 @@
 Plotting Template Transformer
 =============================
 
-An example plot of :class:`extended_path_boost.template.TemplateTransformer`
+An example plot of :class:`path_boost.template.TemplateTransformer`
 """
 import numpy as np
 from matplotlib import pyplot as plt
 
-from extended_path_boost import TemplateTransformer
+from path_boost import TemplateTransformer
 
 X = np.arange(50, dtype=np.float64).reshape(-1, 1)
 X /= 50

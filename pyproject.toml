@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "setuptools_scm[toml]>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "extended_path_boost"
+name = "path_boost"
 dynamic = ["version"]
 authors = [
   { name="Vighnesh Birodkar", email="vighneshbirodkar@nyu.edu" },
@@ -12,14 +12,13 @@ authors = [
 description = "Interpretable machine learning on graph-structured data using path-based boosting."
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "BSD-3-Clause"}
+license = "BSD-3-Clause"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: BSD License",
     "Operating System :: POSIX",
     "Operating System :: Unix",
     "Operating System :: MacOS",
@@ -40,11 +39,11 @@ progress = ["tqdm>=4.64"]
 all = ["tqdm>=4.64"]
 
 [project.urls]
-Homepage = "https://github.com/scikit-learn-contrib/extended_path_boost"
-Issues = "https://github.com/scikit-learn-contrib/extended_path_boost/issues"
+Homepage = "https://github.com/scikit-learn-contrib/path_boost"
+Issues = "https://github.com/scikit-learn-contrib/path_boost/issues"
 
 [tool.setuptools_scm]
-version_file = "extended_path_boost/_version.py"
+version_file = "path_boost/_version.py"
 
 [tool.pixi.project]
 channels = ["conda-forge"]
@@ -55,7 +54,7 @@ python = ">=3.9"
 scikit-learn = ">=1.4.2"
 
 [tool.pixi.pypi-dependencies]
-extended_path_boost = { path=".", editable=true }
+path_boost = { path=".", editable=true }
 
 [tool.pixi.feature.lint.dependencies]
 # The version below should be aligned with the one of `.pre-commit-config.yaml`
@@ -64,8 +63,8 @@ pre-commit = "3.7.1"
 ruff = "0.4.2"
 
 [tool.pixi.feature.lint.tasks]
-black = { cmd = "black --check --diff extended_path_boost && black --check --diff examples" }
-ruff = { cmd = "ruff check --output-format=full extended_path_boost && ruff check --output-format=full examples" }
+black = { cmd = "black --check --diff path_boost && black --check --diff examples" }
+ruff = { cmd = "ruff check --output-format=full path_boost && ruff check --output-format=full examples" }
 lint = { depends_on = ["black", "ruff"]}
 
 [tool.pixi.feature.test.dependencies]
@@ -73,7 +72,7 @@ pytest = "*"
 pytest-cov = "*"
 
 [tool.pixi.feature.test.tasks]
-test = { cmd = "pytest -vsl --cov=extended_path_boost --cov-report=xml extended_path_boost" }
+test = { cmd = "pytest -vsl --cov=path_boost --cov-report=xml path_boost" }
 
 [tool.pixi.feature.doc.dependencies]
 matplotlib = "*"
@@ -106,7 +105,7 @@ exclude = '''
   | \.vscode
 )/
 '''
-force-exclude = "extended_path_boost/_version.py"
+force-exclude = "path_boost/_version.py"
 
 [tool.ruff]
 # max line length for black
@@ -119,7 +118,7 @@ exclude=[
     "doc/_build",
     "doc/auto_examples",
     "build",
-    "extended_path_boost/_version.py",
+    "path_boost/_version.py",
 ]
 
 [tool.ruff.lint]

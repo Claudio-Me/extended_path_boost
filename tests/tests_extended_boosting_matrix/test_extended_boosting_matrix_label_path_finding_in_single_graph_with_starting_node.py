@@ -2,7 +2,7 @@
 
 import networkx as nx
 import pytest
-from extended_path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
+from path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
 
 
 def test_find_labelled_path_in_nx_graph_single_path():

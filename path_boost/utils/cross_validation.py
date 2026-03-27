@@ -1,7 +1,7 @@
 import networkx as nx
 import numpy as np
 from sklearn.model_selection import GridSearchCV, train_test_split
-from extended_path_boost._extended_path_boost import PathBoost
+from path_boost._path_boost import PathBoost
 from sklearn.model_selection import train_test_split
 
 

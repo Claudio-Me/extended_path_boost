@@ -1,8 +1,8 @@
 import sys
 
-sys.path.append('/mn/sarpanitu/ansatte-u6/claudm/PycharmProjects/extended_path_boost/')
+sys.path.append('/mn/sarpanitu/ansatte-u6/claudm/PycharmProjects/path_boost/')
 
-from extended_path_boost._extended_path_boost import PathBoost
+from path_boost._path_boost import PathBoost
 
 import os
 import json
@@ -10,7 +10,7 @@ import uuid
 from sklearn.model_selection import GridSearchCV
 
 from sklearn.model_selection import train_test_split
-from extended_path_boost.utils.datasets_for_examples.generate_example_dataset import generate_synthetic_graph_dataset
+from path_boost.utils.datasets_for_examples.generate_example_dataset import generate_synthetic_graph_dataset
 
 if __name__ == "__main__":
     N_NODE_TYPES = 5  # Total distinct types of nodes, e.g., 0, 1, 2, 3, 4

@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from extended_path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
+from path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
 
 
 def test_get_frequency_boosting_matrix_single_column():

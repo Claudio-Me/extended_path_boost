@@ -1,4 +1,4 @@
-extended_path_boost# Configuration file for the Sphinx documentation builder.
+path_boost# Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
@@ -13,7 +13,7 @@ from importlib.metadata import version as get_version
 project = "Scikit-learn Project Template"
 copyright = "2016, V. Birodkar"
 author = "V. Birodkar"
-release = get_version('extended_path_boost')
+release = get_version('path_boost')
 version = ".".join(release.split(".")[:3])
 
 # -- General configuration ---------------------------------------------------
@@ -44,11 +44,11 @@ default_role = "literal"
 
 html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]
-html_style = "css/extended_path_boost.css"
+html_style = "css/path_boost.css"
 html_logo = "_static/img/logo.png"
 # html_favicon = "_static/img/favicon.ico"
 html_css_files = [
-    "css/extended_path_boost.css",
+    "css/path_boost.css",
 ]
 html_sidebars = {
     "quick_start": [],
@@ -58,7 +58,7 @@ html_sidebars = {
 
 html_theme_options = {
     "external_links": [],
-    "github_url": "https://github.com/scikit-learn-contrib/extended_path_boost",
+    "github_url": "https://github.com/scikit-learn-contrib/path_boost",
     # "twitter_url": "https://twitter.com/pandas_dev",
     "use_edit_page_button": True,
     "show_toc_level": 1,
@@ -67,7 +67,7 @@ html_theme_options = {
 
 html_context = {
     "github_user": "scikit-learn-contrib",
-    "github_repo": "extended_path_boost",
+    "github_repo": "path_boost",
     "github_version": "master",
     "doc_path": "doc",
 }
@@ -106,9 +106,9 @@ intersphinx_mapping = {
 plot_gallery = True
 
 sphinx_gallery_conf = {
-    "doc_module": "extended_path_boost",
+    "doc_module": "path_boost",
     "backreferences_dir": os.path.join("generated"),
     "examples_dirs": "../examples",
     "gallery_dirs": "auto_examples",
-    "reference_url": {"extended_path_boost": None},
+    "reference_url": {"path_boost": None},
 }

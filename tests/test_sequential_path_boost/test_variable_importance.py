@@ -1,6 +1,6 @@
 import networkx as nx
 import numpy as np
-from extended_path_boost.utils.classes.sequential_path_boost import SequentialPathBoost
+from path_boost.utils.classes.sequential_path_boost import SequentialPathBoost
 import pytest
 from tests.datasets_used_for_tests.load_test_dataset import get_nx_test_dataset, get_y
 

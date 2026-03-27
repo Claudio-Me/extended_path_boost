@@ -1,4 +1,4 @@
-extended_path_boost.. _api:
+path_boost.. _api:
 
 #############
 API Reference
@@ -6,7 +6,7 @@ API Reference
 
 This is an example on how to document the API of your own project.
 
-.. currentmodule:: extended_path_boost
+.. currentmodule:: path_boost
 
 Estimator
 =========

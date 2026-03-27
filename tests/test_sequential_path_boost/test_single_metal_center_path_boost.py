@@ -1,7 +1,7 @@
 import networkx as nx
 import numpy as np
 import pytest
-from extended_path_boost.utils.classes.sequential_path_boost import SequentialPathBoost
+from path_boost.utils.classes.sequential_path_boost import SequentialPathBoost
 from sklearn.tree import DecisionTreeRegressor
 
 

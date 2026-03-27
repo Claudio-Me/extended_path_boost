@@ -1,9 +1,9 @@
-# File: extended_path_boost/tests/test_split_extended_path_boost.py
+# File: path_boost/tests/test_split_path_boost.py
 
 import networkx as nx
 import pytest
-from extended_path_boost._extended_path_boost import PathBoost
-from extended_path_boost.utils.cyclic_path_boost_utils import split_dataset_by_metal_centers
+from path_boost._path_boost import PathBoost
+from path_boost.utils.cyclic_path_boost_utils import split_dataset_by_metal_centers
 
 @pytest.fixture
 def example_graphs():

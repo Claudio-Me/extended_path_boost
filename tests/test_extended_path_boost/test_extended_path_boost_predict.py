@@ -1,7 +1,7 @@
 import pytest
 import networkx as nx
 import numpy as np
-from extended_path_boost import PathBoost
+from path_boost import PathBoost
 
 @pytest.fixture
 def sample_graph_data():

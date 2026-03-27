@@ -1,6 +1,6 @@
 import networkx as nx
 import pandas as pd
-from extended_path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
+from path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
 from tests.datasets_used_for_tests import load_test_dataset
 
 

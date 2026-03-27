@@ -75,4 +75,4 @@ target/
 .LSOverride
 
 # auto-generated files
-extended_path_boost/_version.py
+path_boost/_version.py

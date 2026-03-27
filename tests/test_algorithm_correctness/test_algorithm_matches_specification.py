@@ -10,9 +10,9 @@ import pandas as pd
 from unittest.mock import Mock, patch
 from sklearn.tree import DecisionTreeRegressor
 
-from extended_path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
-from extended_path_boost.utils.classes.additive_model_wrapper import AdditiveModelWrapper
-from extended_path_boost.utils.classes.sequential_path_boost import SequentialPathBoost
+from path_boost.utils.classes.extended_boosting_matrix import ExtendedBoostingMatrix
+from path_boost.utils.classes.additive_model_wrapper import AdditiveModelWrapper
+from path_boost.utils.classes.sequential_path_boost import SequentialPathBoost
 
 
 class TestSubPathInclusion:

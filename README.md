@@ -1,6 +1,6 @@
-# Extended Path Boost
+# Path Boost
 
-Extended Path Boost is a Python library for interpretable machine learning on graph-structured data. It implements the PathBoost and SequentialPathBoost algorithms, which iteratively construct features based on paths in graphs and use boosting to build predictive models. The library is designed for tasks where input data consists of collections of graphs (e.g., molecules, social networks) and supports variable importance analysis for interpretability.
+Path Boost is a Python library for interpretable machine learning on graph-structured data. It implements the PathBoost and SequentialPathBoost algorithms, which iteratively construct features based on paths in graphs and use boosting to build predictive models. The library is designed for tasks where input data consists of collections of graphs (e.g., molecules, social networks) and supports variable importance analysis for interpretability.
 
 ## Features
 
@@ -15,7 +15,7 @@ Extended Path Boost is a Python library for interpretable machine learning on gr
 Clone the repository and install dependencies:
 
 ```bash
-pip install -i https://test.pypi.org/simple/ extended-path-boost
+pip install -i https://test.pypi.org/simple/ path-boost
 pip install -r requirements.txt
 ```
 
@@ -27,8 +27,8 @@ Below is a minimal example using the `PathBoost` model:
 import numpy as np
 import networkx as nx
 from sklearn.model_selection import train_test_split
-from extended_path_boost._extended_path_boost import PathBoost
-from extended_path_boost.utils.datasets_for_examples.generate_example_dataset import generate_synthetic_graph_dataset
+from path_boost import PathBoost
+from path_boost.utils.datasets_for_examples.generate_example_dataset import generate_synthetic_graph_dataset
 
 
 

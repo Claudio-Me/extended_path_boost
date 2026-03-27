@@ -1,7 +1,7 @@
 # Authors: scikit-learn-contrib developers
 # License: BSD 3 clause
 
-from ._extended_path_boost import PathBoost
+from ._path_boost import PathBoost
 from .utils.classes.sequential_path_boost import SequentialPathBoost
 from .utils.classes.sequential_path_boost_classifier import SequentialPathBoostClassifier
 from ._version import __version__
