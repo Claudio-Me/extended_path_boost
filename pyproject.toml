@@ -9,12 +9,10 @@ authors = [
   { name="Vighnesh Birodkar", email="vighneshbirodkar@nyu.edu" },
   { name="Guillaume Lemaitre", email="g.lemaitre58@gmail.com" },
 ]
-description = "A template for scikit-learn compatible packages."
+description = "Interpretable machine learning on graph-structured data using path-based boosting."
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = [
-  "scikit-learn>=1.4.2",
-]
+license = {text = "BSD-3-Clause"}
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
@@ -27,6 +25,19 @@ classifiers = [
     "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows",
 ]
+dependencies = [
+  "scikit-learn>=1.4.2",
+  "networkx>=3.0",
+  "pandas>=2.0",
+  "numpy>=1.24",
+  "matplotlib>=3.5",
+  "joblib>=1.2",
+  "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+progress = ["tqdm>=4.64"]
+all = ["tqdm>=4.64"]
 
 [project.urls]
 Homepage = "https://github.com/scikit-learn-contrib/extended_path_boost"

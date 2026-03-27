@@ -1,5 +1,8 @@
 """
-This is a module to be used as a reference for building other modules
+Extended Path Boost - A gradient boosting algorithm for graph-structured data.
+
+This module provides the PathBoost class, an ensemble learning method that builds
+interpretable models for graph data by discovering path-based features.
 """
 
 # Authors: scikit-learn-contrib developers
@@ -7,6 +10,7 @@ This is a module to be used as a reference for building other modules
 
 
 import os
+import logging
 
 # done to limit the number of spawned threads during parallelization
 
@@ -30,12 +34,27 @@ from .utils.variable_importance_according_to_path_boost import VariableImportanc
 from .utils.classes.interfaces.interface_selector import SelectorClassInterface
 from .utils.validate_data import util_validate_data
 from .utils.plots_functions import plot_training_and_eval_errors, plot_variable_importance_utils
-from typing import Iterable
+from typing import Iterable, List, Tuple, Optional, Union, Dict, Any, Type
 from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin, _fit_context
 from sklearn.metrics import mean_squared_error
 from sklearn.utils.validation import check_is_fitted, validate_data
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.base import RegressorMixin
+
+# Type aliases for better readability
+GraphList = List[nx.Graph]
+AnchorLabel = Union[int, str, Tuple]
+AnchorLabelList = List[AnchorLabel]
+EvalSet = List[Tuple[GraphList, Iterable]]
+
+try:
+    from tqdm import tqdm
+    TQDM_AVAILABLE = True
+except ImportError:
+    TQDM_AVAILABLE = False
+
+# Set up logger for the module
+logger = logging.getLogger('extended_path_boost')
 
 
 class PathBoost(BaseEstimator, RegressorMixin):
@@ -253,7 +272,12 @@ class PathBoost(BaseEstimator, RegressorMixin):
         number_of_cores_used = min(mp.cpu_count(), self.n_of_cores, number_of_effective_trained_models)
         if number_of_cores_used <= 1:
             path_boosting_models = []
-            for i in range(len(input_for_parallelization)):
+            # Set up iterator with optional progress bar for sequential training
+            iterator = range(len(input_for_parallelization))
+            if self.verbose and TQDM_AVAILABLE:
+                iterator = tqdm(iterator, desc="Training anchor models", unit="model",
+                              bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]')
+            for i in iterator:
                 path_boosting_models.append(wbu.train_pattern_boosting(input_for_parallelization[i]))
 
         else:
@@ -291,18 +315,33 @@ class PathBoost(BaseEstimator, RegressorMixin):
         train_mse = train_mse / sum(number_of_observations_for_each_model)
         return train_mse
 
-    def predict(self, X: list[nx.Graph]):
-        """A reference implementation of a predicting function.
+    def predict(self, X: List[nx.Graph]) -> List[float]:
+        """
+        Predict target values for the input graphs.
+
+        This method partitions the input graphs by anchor nodes, generates
+        predictions using the corresponding trained SequentialPathBoost models,
+        and averages predictions across models for graphs with multiple anchor types.
 
         Parameters
         ----------
-        X : {array-like, sparse matrix}, shape (n_samples, n_features)
-            The training input samples.
+        X : List[nx.Graph]
+            A list of NetworkX graph objects for which to make predictions.
 
         Returns
         -------
-        y : ndarray, shape (n_samples,)
-            Returns an array of ones.
+        predictions : List[float]
+            Predicted target values for each input graph.
+
+        Raises
+        ------
+        sklearn.exceptions.NotFittedError
+            If the model has not been fitted yet.
+
+        Examples
+        --------
+        >>> predictions = model.predict(X_test)  # doctest: +SKIP
+        >>> print(f"Mean prediction: {np.mean(predictions):.3f}")  # doctest: +SKIP
         """
         # Check if fit had been called
         check_is_fitted(self)
@@ -580,6 +619,272 @@ class PathBoost(BaseEstimator, RegressorMixin):
             return final_eval_set_mse
         else:
             raise AttributeError("Evaluation set MSE is not available. Please fit the model with eval_set.")
+
+    def save(self, filepath: str) -> None:
+        """
+        Save the fitted model to a file.
+
+        This method serializes the entire PathBoost model, including all trained
+        SequentialPathBoost sub-models, to a file using joblib. The saved file
+        includes metadata such as the package version and training parameters.
+
+        Parameters
+        ----------
+        filepath : str
+            The path where the model should be saved. The file extension
+            `.joblib` is recommended but not required.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been fitted yet.
+
+        Examples
+        --------
+        >>> model = PathBoost(n_iter=50)  # doctest: +SKIP
+        >>> model.fit(X_train, y_train, anchor_nodes_label_name='atomic_number',
+        ...           list_anchor_nodes_labels=[1, 6, 7, 8])  # doctest: +SKIP
+        >>> model.save('my_model.joblib')  # doctest: +SKIP
+
+        See Also
+        --------
+        load : Load a saved model from file.
+        """
+        import joblib
+        from datetime import datetime
+        from ._version import __version__
+
+        check_is_fitted(self)
+
+        # Create metadata dictionary
+        metadata = {
+            'version': __version__,
+            'saved_at': datetime.now().isoformat(),
+            'n_iter': self.n_iter,
+            'max_path_length': self.max_path_length,
+            'learning_rate': self.learning_rate,
+            'anchor_nodes_label_name': self.anchor_nodes_label_name_,
+            'list_anchor_nodes_labels': self.list_anchor_nodes_labels_,
+            'n_models': len(self.models_list_),
+        }
+
+        # Package model and metadata
+        save_dict = {
+            'model': self,
+            'metadata': metadata,
+        }
+
+        joblib.dump(save_dict, filepath)
+        logger.info(f"Model saved to {filepath}")
+
+    @classmethod
+    def load(cls, filepath: str) -> 'PathBoost':
+        """
+        Load a saved PathBoost model from a file.
+
+        This class method deserializes a PathBoost model that was previously
+        saved using the `save` method. It restores the complete model state
+        including all trained sub-models and parameters.
+
+        Parameters
+        ----------
+        filepath : str
+            The path to the saved model file.
+
+        Returns
+        -------
+        PathBoost
+            The loaded PathBoost model, ready for prediction.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the specified file does not exist.
+        ValueError
+            If the file does not contain a valid PathBoost model.
+
+        Warns
+        -----
+        UserWarning
+            If the model was saved with a different version of the package.
+
+        Examples
+        --------
+        >>> model = PathBoost.load('my_model.joblib')  # doctest: +SKIP
+        >>> predictions = model.predict(X_test)  # doctest: +SKIP
+
+        See Also
+        --------
+        save : Save a fitted model to file.
+
+        Notes
+        -----
+        Models saved with older versions of the package may not be fully
+        compatible. A warning will be issued if version mismatch is detected.
+        """
+        import joblib
+        from ._version import __version__
+
+        save_dict = joblib.load(filepath)
+
+        # Validate the loaded object
+        if not isinstance(save_dict, dict) or 'model' not in save_dict:
+            raise ValueError(
+                f"Invalid model file. Expected a PathBoost save file, but got {type(save_dict)}"
+            )
+
+        model = save_dict['model']
+        metadata = save_dict.get('metadata', {})
+
+        # Check version compatibility
+        saved_version = metadata.get('version', 'unknown')
+        if saved_version != __version__:
+            warnings.warn(
+                f"Model was saved with version {saved_version}, but current version is {__version__}. "
+                "Some features may not work correctly.",
+                UserWarning
+            )
+
+        logger.info(f"Model loaded from {filepath} (saved: {metadata.get('saved_at', 'unknown')})")
+        return model
+
+    def predict_with_uncertainty(
+        self,
+        X: List[nx.Graph],
+        confidence: float = 0.95
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Predict target values with uncertainty estimates using anchor node bootstrap.
+
+        This method leverages the natural ensemble structure of PathBoost, where
+        separate models are trained for each anchor node type. Instead of simply
+        averaging predictions across anchor models, this method computes the
+        variance across individual model predictions to estimate uncertainty.
+
+        Parameters
+        ----------
+        X : List[nx.Graph]
+            A list of NetworkX graph objects for which to make predictions.
+        confidence : float, default=0.95
+            The confidence level for the prediction intervals. Must be between
+            0 and 1. Common values are 0.90, 0.95, and 0.99.
+
+        Returns
+        -------
+        predictions : np.ndarray
+            Point estimates (mean predictions) for each input graph.
+            Shape: (n_samples,)
+        lower_bounds : np.ndarray
+            Lower bounds of the confidence interval for each prediction.
+            Shape: (n_samples,)
+        upper_bounds : np.ndarray
+            Upper bounds of the confidence interval for each prediction.
+            Shape: (n_samples,)
+
+        Raises
+        ------
+        ValueError
+            If confidence is not between 0 and 1.
+            If fewer than 2 anchor node models were trained (uncertainty requires
+            multiple models for bootstrap estimation).
+
+        Notes
+        -----
+        The uncertainty estimates are based on the variance across anchor node
+        models. This approach is valid when:
+        - Multiple anchor node types were used during training
+        - Each graph contains nodes from multiple anchor types
+
+        For graphs that only match a single anchor type, the uncertainty
+        estimate will be based on fewer models and may be less reliable.
+
+        The confidence intervals assume approximate normality of the prediction
+        distribution across anchor models. For small numbers of anchor types,
+        this assumption may not hold exactly.
+
+        Examples
+        --------
+        >>> model = PathBoost(n_iter=50)  # doctest: +SKIP
+        >>> model.fit(X_train, y_train, anchor_nodes_label_name='atomic_number',
+        ...           list_anchor_nodes_labels=[6, 7, 8, 9])  # doctest: +SKIP
+        >>> predictions, lower, upper = model.predict_with_uncertainty(X_test)  # doctest: +SKIP
+        >>> for i in range(5):  # doctest: +SKIP
+        ...     print(f"Pred: {predictions[i]:.2f}, CI: [{lower[i]:.2f}, {upper[i]:.2f}]")
+
+        See Also
+        --------
+        predict : Standard prediction without uncertainty estimates.
+        """
+        from scipy import stats
+
+        # Validate inputs
+        check_is_fitted(self)
+
+        if not 0 < confidence < 1:
+            raise ValueError(f"confidence must be between 0 and 1, got {confidence}")
+
+        n_effective_models = sum(1 for m in self.models_list_ if m is not None)
+        if n_effective_models < 2:
+            raise ValueError(
+                f"predict_with_uncertainty requires at least 2 trained anchor models, "
+                f"but only {n_effective_models} model(s) were trained. "
+                "Use predict() for standard predictions."
+            )
+
+        X = self._validate_data(X=X)
+
+        # Get predictions from each anchor model separately
+        indexes_of_graphs_for_each_anchor_label: List[List[int]] = wbu.split_dataset_by_metal_centers(
+            graphs_list=X,
+            anchor_nodes_label_name=self.anchor_nodes_label_name_,
+            anchor_nodes=self.list_anchor_nodes_labels_
+        )
+
+        # Create datasets for each anchor node
+        datasets_for_each_anchor_label = []
+        for i, _ in enumerate(self.list_anchor_nodes_labels_):
+            indexes = indexes_of_graphs_for_each_anchor_label[i]
+            dataset = [X[index] for index in indexes]
+            datasets_for_each_anchor_label.append(dataset)
+
+        # Get predictions from each model
+        predictions_matrix = np.full((len(X), len(self.list_anchor_nodes_labels_)), np.nan)
+
+        for anchor_idx, (model, dataset) in enumerate(zip(self.models_list_, datasets_for_each_anchor_label)):
+            if model is not None and len(dataset) > 0:
+                preds = model.predict(dataset)
+                graph_indices = indexes_of_graphs_for_each_anchor_label[anchor_idx]
+                for local_idx, global_idx in enumerate(graph_indices):
+                    predictions_matrix[global_idx, anchor_idx] = preds[local_idx]
+
+        # Compute statistics across anchor models
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            # Mean prediction (ignoring NaN)
+            predictions = np.nanmean(predictions_matrix, axis=1)
+            # Standard deviation across models
+            std_devs = np.nanstd(predictions_matrix, axis=1, ddof=1)
+            # Count of models contributing to each prediction
+            n_models_per_sample = np.sum(~np.isnan(predictions_matrix), axis=1)
+
+        # Replace NaN predictions with 0 (same as regular predict)
+        predictions = np.where(np.isnan(predictions), 0, predictions)
+
+        # Compute confidence intervals
+        # Use t-distribution for small sample sizes
+        alpha = 1 - confidence
+        z_score = stats.norm.ppf(1 - alpha / 2)  # Two-tailed
+
+        # Standard error of the mean
+        standard_errors = std_devs / np.sqrt(np.maximum(n_models_per_sample, 1))
+
+        # For samples with only 1 model, set uncertainty to 0 (no information)
+        standard_errors = np.where(n_models_per_sample < 2, 0, standard_errors)
+
+        lower_bounds = predictions - z_score * standard_errors
+        upper_bounds = predictions + z_score * standard_errors
+
+        return predictions, lower_bounds, upper_bounds
 
 
 if __name__ == "__main__":

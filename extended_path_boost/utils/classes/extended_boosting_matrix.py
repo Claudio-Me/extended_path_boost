@@ -119,6 +119,7 @@ class ExtendedBoostingMatrix:
 
         path_frequency_column = df_to_be_expanded[path_frequency_column_name]
 
+        # find all the efective paths in the dataset that corresponds to the selected path
         effective_paths_in_graphs = ExtendedBoostingMatrix.find_paths_in_dataset(dataset=dataset,
                                                                                  path_labels=selected_path,
                                                                                  id_label_name=main_label_name,
