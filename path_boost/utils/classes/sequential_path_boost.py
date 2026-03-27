@@ -252,7 +252,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
 
         for n_iteration in iterator:
             if self.verbose and not TQDM_AVAILABLE:
-                print("iteration number: ", n_iteration + 1)
+                logger.info(f"iteration number: {n_iteration + 1}")
             logger.debug(f"Starting iteration {n_iteration + 1}")
 
             # this is a parameter used for a check when computing variable importance, to make sure we are computing it on the right iteration, with the right ebm
@@ -281,7 +281,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                     if hasattr(iterator, 'set_postfix'):
                         iterator.set_postfix({'path': str(best_path)[:30]})
                 else:
-                    print("Best path: ", best_path)
+                    logger.info(f"Best path: {best_path}")
 
             # we collect some values for variable importance, important that this operation it is done between the
             # selection of the best path and the expansion of the ebm dataframe
@@ -316,7 +316,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                                              target_error=self.target_error, tol=self.tol):
                     logger.info(f"Early stopping at iteration {n_iteration + 1} (best MSE: {self._best_eval_mse_:.6f})")
                     if self.verbose:
-                        print(
+                        logger.info(
                             f"Early stopping at iteration {n_iteration + 1} due to no improvement in evaluation set MSE.")
                         self.n_iter = n_iteration
                     break
@@ -358,7 +358,7 @@ class SequentialPathBoost(BaseEstimator, RegressorMixin):
                 self.eval_sets_mae_ = self.base_learner_.eval_sets_mae
 
                 if self.verbose:
-                    print(f"Restored model to best iteration {self._best_iteration_ + 1} with eval MSE {self._best_eval_mse_:.6f}")
+                    logger.info(f"Restored model to best iteration {self._best_iteration_ + 1} with eval MSE {self._best_eval_mse_:.6f}")
                 logger.info(f"Restored model to best iteration {self._best_iteration_ + 1}")
 
         # Log training completion

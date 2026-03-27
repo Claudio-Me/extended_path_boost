@@ -1,8 +1,12 @@
-import networkx as nx
-import pandas as pd
+import logging
 import numbers
+
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
+import pandas as pd
+
+logger = logging.getLogger('path_boost')
 
 from .interfaces.interface_base_learner import BaseLearnerClassInterface
 from .interfaces.interface_selector import SelectorClassInterface
@@ -171,7 +175,7 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
 
         for n_iteration in range(self.n_iter):
             if self.verbose:
-                print("iteration number: ", n_iteration + 1)
+                logger.info(f"iteration number: {n_iteration + 1}")
 
             # this is a parameter used for a check when computing variable importance, to make sure we are computing it on the right iteration, with the right ebm
             self._ebm_has_been_expanded_in_this_iteration = False
