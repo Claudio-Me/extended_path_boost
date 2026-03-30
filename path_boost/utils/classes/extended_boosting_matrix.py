@@ -20,6 +20,7 @@ class ExtendedBoostingMatrix:
                                                 ebm_to_be_expanded: pd.DataFrame | None = None,
                                                 replace_nan_with=np.nan) -> pd.DataFrame:
         new_columns = None
+        expected_n_rows = len(dataset)
 
         # find paths names in column_names
         # for each path find which column in columns_names are related to it
@@ -52,9 +53,13 @@ class ExtendedBoostingMatrix:
             else:
                 new_columns = pd.concat([new_columns, expanded_columns], axis=1)
 
+        if new_columns is None:
+            # Keep shape consistent with dataset even when no path yields columns.
+            new_columns = pd.DataFrame(index=range(expected_n_rows))
+
         # Check if new_columns contains all columns_names and add missing columns
         missing_columns = [column for column in columns_names if column not in new_columns.columns]
-        missing_df = pd.DataFrame({col: [None] * len(new_columns) for col in missing_columns})
+        missing_df = pd.DataFrame({col: [replace_nan_with] * expected_n_rows for col in missing_columns})
         new_columns = pd.concat([new_columns, missing_df], axis=1)
 
         return new_columns
@@ -94,7 +99,11 @@ class ExtendedBoostingMatrix:
                     0]
                 columns_for_dataframe[frequency_column_name][graph_number] = len(paths_found)
 
-        new_df_columns = pd.DataFrame(columns_for_dataframe)
+        if len(columns_for_dataframe) == 0:
+            # If the path is absent in every graph, preserve row count for downstream concatenation.
+            new_df_columns = pd.DataFrame(index=range(len(dataset)))
+        else:
+            new_df_columns = pd.DataFrame(columns_for_dataframe)
         new_df_columns = ExtendedBoostingMatrix._remove_empty_list_values_from_df(new_df_columns,
                                                                                   default_value=replace_nan_with)
 

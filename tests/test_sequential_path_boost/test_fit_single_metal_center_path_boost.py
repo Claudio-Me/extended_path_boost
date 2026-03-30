@@ -342,3 +342,30 @@ def test_training_error_is_monotonically_decreasing_synthetic_data():
             f"({booster.train_mse_[i - 1]})"
         )
 
+
+def test_generate_ebm_for_dataset_with_unseen_selected_path_preserves_shape():
+    model = SequentialPathBoost(replace_nan_with=-1)
+    model.is_fitted_ = True
+    model.name_of_label_attribute_ = "label"
+    model.paths_selected_by_epb_ = {(9, 6)}
+    model.columns_names_ = [
+        "(9, 6)_atomic_number",
+        "(9, 6)_degree",
+        "(9, 6)_formal_charge",
+        "(9, 6)_n_times_present",
+    ]
+
+    graph_1 = nx.Graph()
+    graph_1.add_node(0, label=1, attr=11)
+    graph_2 = nx.Graph()
+    graph_2.add_node(0, label=2, attr=22)
+    dataset = [graph_1, graph_2]
+
+    ebm_dataframe = model.generate_ebm_for_dataset(dataset=dataset)
+
+    assert len(ebm_dataframe) == len(dataset)
+    assert set(model.columns_names_).issubset(set(ebm_dataframe.columns))
+    assert (ebm_dataframe[["(9, 6)_atomic_number", "(9, 6)_degree", "(9, 6)_formal_charge"]] == -1).all().all()
+    assert (ebm_dataframe["(9, 6)_n_times_present"] == 0).all()
+
+
