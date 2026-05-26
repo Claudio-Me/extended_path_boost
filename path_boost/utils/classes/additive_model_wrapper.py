@@ -10,8 +10,13 @@ from .interfaces.interface_base_learner import BaseLearnerClassInterface
 
 
 class AdditiveModelWrapper:
-    def __init__(self, BaseModelClass, base_model_class_kwargs, learning_rate: float,
-                 learning_rate_scheduler: callable = None):
+    def __init__(
+        self,
+        BaseModelClass,
+        base_model_class_kwargs,
+        learning_rate: float,
+        learning_rate_scheduler: callable = None,
+    ):
         """
         Initialize the AdditiveModelWrapper.
 
@@ -29,7 +34,9 @@ class AdditiveModelWrapper:
         """
         # Ensure BaseModelClass respects BaseLearnerClassInterface
         if not issubclass(BaseModelClass, BaseLearnerClassInterface):
-            raise TypeError(f"{BaseModelClass.__name__} must implement BaseLearnerClassInterface")
+            raise TypeError(
+                f"{BaseModelClass.__name__} must implement BaseLearnerClassInterface"
+            )
 
         self._last_train_prediction: pd.Series | None = None
 
@@ -45,18 +52,21 @@ class AdditiveModelWrapper:
         self.BaseModelClass = BaseModelClass
         self.base_model_class_kwargs = base_model_class_kwargs
 
-    def fit_one_step(self, X: pd.DataFrame, y, best_path, eval_set=None, negative_gradient=None):
+    def fit_one_step(
+        self, X: pd.DataFrame, y, best_path, eval_set=None, negative_gradient=None
+    ):
         # it fits one step of the boosting
 
         # Apply learning rate scheduler if provided
         if self.learning_rate_scheduler is not None:
             iteration = len(self.base_learners_list)
             self.learning_rate = self.learning_rate_scheduler(
-                initial_lr=self._initial_learning_rate,
-                iteration=iteration
+                initial_lr=self._initial_learning_rate, iteration=iteration
             )
 
-        columns_to_keep = ExtendedBoostingMatrix.get_columns_related_to_path(best_path, X.columns)
+        columns_to_keep = ExtendedBoostingMatrix.get_columns_related_to_path(
+            best_path, X.columns
+        )
         restricted_df = X[columns_to_keep]
         if self.base_model_class_kwargs is not None:
             new_base_learner = self.BaseModelClass(**self.base_model_class_kwargs)
@@ -64,14 +74,17 @@ class AdditiveModelWrapper:
             new_base_learner = self.BaseModelClass()
 
         self.trained_ = True
-        if eval_set is not None and not hasattr(self, '_last_eval_set_prediction_'):
+        if eval_set is not None and not hasattr(self, "_last_eval_set_prediction_"):
             self._last_eval_set_prediction_ = []
             for eval_tuple in eval_set:
                 if eval_tuple is None:
                     self._last_eval_set_prediction_.append(None)
                 else:
                     self._last_eval_set_prediction_.append(
-                        pd.Series(np.zeros(len(eval_tuple[0])), index=eval_tuple[0].index))
+                        pd.Series(
+                            np.zeros(len(eval_tuple[0])), index=eval_tuple[0].index
+                        )
+                    )
 
         if len(self.base_learners_list) == 0:
             # it is the first time we fit it so we do not need to compute the neg gradient
@@ -84,22 +97,27 @@ class AdditiveModelWrapper:
             new_base_learner.fit(restricted_df, new_y)
             self.base_learners_list.append(new_base_learner)
             self.considered_columns.append(columns_to_keep)
-            base_learner_prediction = self._target_variable_mean_ + self.learning_rate * pd.Series(
-                new_base_learner.predict(X[columns_to_keep]))
+            base_learner_prediction = (
+                self._target_variable_mean_
+                + self.learning_rate
+                * pd.Series(new_base_learner.predict(X[columns_to_keep]))
+            )
             self._last_train_prediction = base_learner_prediction
 
             train_mse = mean_squared_error(y_true=y, y_pred=self._last_train_prediction)
-            train_mae = mean_absolute_error(y_true=y, y_pred=self._last_train_prediction)
+            train_mae = mean_absolute_error(
+                y_true=y, y_pred=self._last_train_prediction
+            )
 
             self.train_mse.append(train_mse)
             self.train_mae.append(train_mae)
 
-
         else:
-
             # compute the new target (we have to use zeroed_y - true_neg_gradient instead of just zeroed_y, more explained in paper)
             if negative_gradient is None:
-                negative_gradient = self._neg_gradient(y=y, y_hat=self._last_train_prediction)
+                negative_gradient = self._neg_gradient(
+                    y=y, y_hat=self._last_train_prediction
+                )
             new_y = np.array(negative_gradient)
 
             self._target_variable_mean_.append(new_y.mean())
@@ -110,19 +128,26 @@ class AdditiveModelWrapper:
             self.base_learners_list.append(new_base_learner)
             self.considered_columns.append(columns_to_keep)
 
-            base_learner_prediction = self._target_variable_mean_[-1] + self.learning_rate * new_base_learner.predict(
-                X[columns_to_keep])
+            base_learner_prediction = self._target_variable_mean_[
+                -1
+            ] + self.learning_rate * new_base_learner.predict(X[columns_to_keep])
             self._last_train_prediction += base_learner_prediction
 
             train_mse = mean_squared_error(y_true=y, y_pred=self._last_train_prediction)
-            train_mae = mean_absolute_error(y_true=y, y_pred=self._last_train_prediction)
+            train_mae = mean_absolute_error(
+                y_true=y, y_pred=self._last_train_prediction
+            )
 
             self.train_mse.append(train_mse)
             self.train_mae.append(train_mae)
 
         if eval_set is not None:
-            this_iter_eval_set_mse: list[float | None] = [None for _ in range(len(eval_set))]
-            this_iter_eval_set_mae: list[float | None] = [None for _ in range(len(eval_set))]
+            this_iter_eval_set_mse: list[float | None] = [
+                None for _ in range(len(eval_set))
+            ]
+            this_iter_eval_set_mae: list[float | None] = [
+                None for _ in range(len(eval_set))
+            ]
 
             for i, eval_tuple in enumerate(eval_set):
                 if eval_tuple is None:
@@ -132,13 +157,18 @@ class AdditiveModelWrapper:
                 assert isinstance(ebm_df_eval, pd.DataFrame)
 
                 base_learner_prediction = self._target_variable_mean_[
-                                              -1] + self.learning_rate * new_base_learner.predict(
-                    ebm_df_eval[columns_to_keep])
+                    -1
+                ] + self.learning_rate * new_base_learner.predict(
+                    ebm_df_eval[columns_to_keep]
+                )
 
                 self._last_eval_set_prediction_[i] += base_learner_prediction
-                this_iter_eval_set_mse[i] = mean_squared_error(y_true=y_eval, y_pred=self._last_eval_set_prediction_[i])
-                this_iter_eval_set_mae[i] = mean_absolute_error(y_true=y_eval,
-                                                                y_pred=self._last_eval_set_prediction_[i])
+                this_iter_eval_set_mse[i] = mean_squared_error(
+                    y_true=y_eval, y_pred=self._last_eval_set_prediction_[i]
+                )
+                this_iter_eval_set_mae[i] = mean_absolute_error(
+                    y_true=y_eval, y_pred=self._last_eval_set_prediction_[i]
+                )
 
             if len(self.eval_sets_mse) == 0:
                 for eval_set_error in this_iter_eval_set_mse:
@@ -165,8 +195,11 @@ class AdditiveModelWrapper:
         last_prediction = np.zeros(len(X))
         for i, base_learner in enumerate(self.base_learners_list):
             chosen_columns = self.considered_columns[i]
-            last_prediction += self._target_variable_mean_[i] + self.learning_rate * np.array(
-                base_learner.predict(X[chosen_columns], **kwargs))
+            last_prediction += self._target_variable_mean_[
+                i
+            ] + self.learning_rate * np.array(
+                base_learner.predict(X[chosen_columns], **kwargs)
+            )
             prediction.append(copy.deepcopy(last_prediction))
         return prediction
 
@@ -188,7 +221,9 @@ class AdditiveModelWrapper:
 
 
 # Learning rate schedulers
-def exponential_decay_scheduler(initial_lr: float, iteration: int, decay_rate: float = 0.95) -> float:
+def exponential_decay_scheduler(
+    initial_lr: float, iteration: int, decay_rate: float = 0.95
+) -> float:
     """
     Exponential decay learning rate scheduler.
 
@@ -208,10 +243,12 @@ def exponential_decay_scheduler(initial_lr: float, iteration: int, decay_rate: f
     float
         The learning rate for this iteration.
     """
-    return initial_lr * (decay_rate ** iteration)
+    return initial_lr * (decay_rate**iteration)
 
 
-def step_decay_scheduler(initial_lr: float, iteration: int, drop_every: int = 10, drop_factor: float = 0.5) -> float:
+def step_decay_scheduler(
+    initial_lr: float, iteration: int, drop_every: int = 10, drop_factor: float = 0.5
+) -> float:
     """
     Step decay learning rate scheduler.
 
@@ -236,7 +273,9 @@ def step_decay_scheduler(initial_lr: float, iteration: int, drop_every: int = 10
     return initial_lr * (drop_factor ** (iteration // drop_every))
 
 
-def linear_decay_scheduler(initial_lr: float, iteration: int, total_iterations: int = 100, min_lr: float = 0.01) -> float:
+def linear_decay_scheduler(
+    initial_lr: float, iteration: int, total_iterations: int = 100, min_lr: float = 0.01
+) -> float:
     """
     Linear decay learning rate scheduler.
 

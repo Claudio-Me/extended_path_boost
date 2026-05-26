@@ -30,10 +30,15 @@ import matplotlib.pyplot as plt
 from .utils.classes.sequential_path_boost import SequentialPathBoost
 from .utils import cyclic_path_boost_utils as wbu
 from .utils.classes.interfaces.interface_base_learner import BaseLearnerClassInterface
-from .utils.variable_importance_according_to_path_boost import VariableImportance_ForSequentialPathBoost
+from .utils.variable_importance_according_to_path_boost import (
+    VariableImportance_ForSequentialPathBoost,
+)
 from .utils.classes.interfaces.interface_selector import SelectorClassInterface
 from .utils.validate_data import util_validate_data
-from .utils.plots_functions import plot_training_and_eval_errors, plot_variable_importance_utils
+from .utils.plots_functions import (
+    plot_training_and_eval_errors,
+    plot_variable_importance_utils,
+)
 from typing import Iterable, List, Tuple, Optional, Union, Dict, Any, Type
 from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin, _fit_context
 from sklearn.metrics import mean_squared_error
@@ -49,12 +54,13 @@ EvalSet = List[Tuple[GraphList, Iterable]]
 
 try:
     from tqdm import tqdm
+
     TQDM_AVAILABLE = True
 except ImportError:
     TQDM_AVAILABLE = False
 
 # Set up logger for the module
-logger = logging.getLogger('path_boost')
+logger = logging.getLogger("path_boost")
 
 
 class PathBoost(BaseEstimator, RegressorMixin):
@@ -119,23 +125,26 @@ class PathBoost(BaseEstimator, RegressorMixin):
         "anchor_nodes_label_name": [str],
         "verbose": [bool],
         "n_of_cores": [numbers.Integral],
-        "parameters_variable_importance": [dict, None]
+        "parameters_variable_importance": [dict, None],
     }
 
-    def __init__(self, n_iter=100,
-                 patience: int | None = None,
-                 target_error: float | None = None,
-                 max_path_length=10,
-                 learning_rate=0.1,
-                 m_stops: list[int] = None,
-                 BaseLearnerClass=DecisionTreeRegressor,
-                 kwargs_for_base_learner=None,
-                 SelectorClass=DecisionTreeRegressor,
-                 kwargs_for_selector=None,
-                 parameters_variable_importance=None,
-                 replace_nan_with=np.nan,
-                 verbose: bool = False, n_of_cores: int = 1):
-
+    def __init__(
+        self,
+        n_iter=100,
+        patience: int | None = None,
+        target_error: float | None = None,
+        max_path_length=10,
+        learning_rate=0.1,
+        m_stops: list[int] = None,
+        BaseLearnerClass=DecisionTreeRegressor,
+        kwargs_for_base_learner=None,
+        SelectorClass=DecisionTreeRegressor,
+        kwargs_for_selector=None,
+        parameters_variable_importance=None,
+        replace_nan_with=np.nan,
+        verbose: bool = False,
+        n_of_cores: int = 1,
+    ):
         self.n_iter: int = n_iter
         self.patience: int = patience
         self.target_error: float | None = target_error
@@ -152,8 +161,14 @@ class PathBoost(BaseEstimator, RegressorMixin):
         self.parameters_variable_importance = parameters_variable_importance
 
     @_fit_context(prefer_skip_nested_validation=True)
-    def fit(self, X: list[nx.Graph], y: Iterable, anchor_nodes_label_name: str, list_anchor_nodes_labels: list[tuple],
-            eval_set: list[tuple[list[nx.Graph], Iterable]] | None = None):
+    def fit(
+        self,
+        X: list[nx.Graph],
+        y: Iterable,
+        anchor_nodes_label_name: str,
+        list_anchor_nodes_labels: list[tuple],
+        eval_set: list[tuple[list[nx.Graph], Iterable]] | None = None,
+    ):
         """
         Fits the PathBoost model to the training data.
 
@@ -193,38 +208,57 @@ class PathBoost(BaseEstimator, RegressorMixin):
         """
         # Configure logging based on verbose flag
         if self.verbose:
-            logging.getLogger('path_boost').setLevel(logging.INFO)
-            if not logging.getLogger('path_boost').handlers:
+            logging.getLogger("path_boost").setLevel(logging.INFO)
+            if not logging.getLogger("path_boost").handlers:
                 handler = logging.StreamHandler()
-                handler.setFormatter(logging.Formatter('%(message)s'))
-                logging.getLogger('path_boost').addHandler(handler)
+                handler.setFormatter(logging.Formatter("%(message)s"))
+                logging.getLogger("path_boost").addHandler(handler)
 
-        self._default_kwargs_for_base_learner = {'max_depth': 3, 'random_state': 0,
-                                                 'splitter': 'best', 'criterion': "squared_error"}
+        self._default_kwargs_for_base_learner = {
+            "max_depth": 3,
+            "random_state": 0,
+            "splitter": "best",
+            "criterion": "squared_error",
+        }
 
-        self._default_kwargs_for_selector = {'max_depth': 1, 'random_state': 0, 'splitter': 'best',
-                                             'criterion': "squared_error"}
+        self._default_kwargs_for_selector = {
+            "max_depth": 1,
+            "random_state": 0,
+            "splitter": "best",
+            "criterion": "squared_error",
+        }
 
         self.anchor_nodes_label_name_ = anchor_nodes_label_name
         self.list_anchor_nodes_labels_ = list_anchor_nodes_labels
 
-        X, y = self._validate_data(X=X, y=y, list_anchor_nodes_labels=list_anchor_nodes_labels, eval_set=eval_set,
-                                   m_stops=self.m_stops, name_of_label_attribute=anchor_nodes_label_name,
-                                   parameters_variable_importance=self.parameters_variable_importance,
-                                   patience=self.patience)
+        X, y = self._validate_data(
+            X=X,
+            y=y,
+            list_anchor_nodes_labels=list_anchor_nodes_labels,
+            eval_set=eval_set,
+            m_stops=self.m_stops,
+            name_of_label_attribute=anchor_nodes_label_name,
+            parameters_variable_importance=self.parameters_variable_importance,
+            patience=self.patience,
+        )
 
         # if variable importance is used, we need all the sub models to not normalize the data and eventually remember to normalize later
         if self.parameters_variable_importance is not None:
-            self.normalize_path_importance_: bool = self.parameters_variable_importance.get('normalize', False)
-            self.parameters_variable_importance['normalize'] = False
+            self.normalize_path_importance_: bool = (
+                self.parameters_variable_importance.get("normalize", False)
+            )
+            self.parameters_variable_importance["normalize"] = False
 
         self.is_fitted_ = True
 
         # divide the training dataset by metal center
-        indexes_of_train_graphs_for_each_anchor_label: list[list[int]] = wbu.split_dataset_by_metal_centers(
-            graphs_list=X,
-            anchor_nodes_label_name=self.anchor_nodes_label_name_,
-            anchor_nodes=self.list_anchor_nodes_labels_)
+        indexes_of_train_graphs_for_each_anchor_label: list[list[int]] = (
+            wbu.split_dataset_by_metal_centers(
+                graphs_list=X,
+                anchor_nodes_label_name=self.anchor_nodes_label_name_,
+                anchor_nodes=self.list_anchor_nodes_labels_,
+            )
+        )
 
         train_datasets_for_each_anchor_label = []
         train_labels_for_each_anchor_label = []
@@ -250,18 +284,20 @@ class PathBoost(BaseEstimator, RegressorMixin):
                         m_stops_counter += 1
 
                 self.models_list_.append(
-                    SequentialPathBoost(n_iter=n_iter,
-                                        patience=self.patience,
-                                        target_error=self.target_error,
-                                        max_path_length=self.max_path_length,
-                                        learning_rate=self.learning_rate,
-                                        BaseLearnerClass=self.BaseLearnerClass,
-                                        SelectorClass=self.SelectorClass,
-                                        kwargs_for_base_learner=self.kwargs_for_base_learner,
-                                        kwargs_for_selector=self.kwargs_for_selector,
-                                        parameters_variable_importance=self.parameters_variable_importance,
-                                        replace_nan_with=self.replace_nan_with,
-                                        verbose=self.verbose)
+                    SequentialPathBoost(
+                        n_iter=n_iter,
+                        patience=self.patience,
+                        target_error=self.target_error,
+                        max_path_length=self.max_path_length,
+                        learning_rate=self.learning_rate,
+                        BaseLearnerClass=self.BaseLearnerClass,
+                        SelectorClass=self.SelectorClass,
+                        kwargs_for_base_learner=self.kwargs_for_base_learner,
+                        kwargs_for_selector=self.kwargs_for_selector,
+                        parameters_variable_importance=self.parameters_variable_importance,
+                        replace_nan_with=self.replace_nan_with,
+                        verbose=self.verbose,
+                    )
                 )
 
             else:
@@ -270,37 +306,62 @@ class PathBoost(BaseEstimator, RegressorMixin):
 
         # parallelization
         # We will use the `wbu.train_pattern_boosting` function to train the model in parallel.
-        input_for_parallelization = list(zip(self.models_list_, train_datasets_for_each_anchor_label,
-                                             train_labels_for_each_anchor_label,
-                                             self.list_anchor_nodes_labels_,
-                                             [anchor_nodes_label_name for _ in
-                                              range(len(self.list_anchor_nodes_labels_))]))
+        input_for_parallelization = list(
+            zip(
+                self.models_list_,
+                train_datasets_for_each_anchor_label,
+                train_labels_for_each_anchor_label,
+                self.list_anchor_nodes_labels_,
+                [
+                    anchor_nodes_label_name
+                    for _ in range(len(self.list_anchor_nodes_labels_))
+                ],
+            )
+        )
 
-        number_of_effective_trained_models: int = sum(1 for model in self.models_list_ if model is not None)
-        number_of_cores_used = min(mp.cpu_count(), self.n_of_cores, number_of_effective_trained_models)
+        number_of_effective_trained_models: int = sum(
+            1 for model in self.models_list_ if model is not None
+        )
+        number_of_cores_used = min(
+            mp.cpu_count(), self.n_of_cores, number_of_effective_trained_models
+        )
         if number_of_cores_used <= 1:
             path_boosting_models = []
             # Set up iterator with optional progress bar for sequential training
             iterator = range(len(input_for_parallelization))
             if self.verbose and TQDM_AVAILABLE:
-                iterator = tqdm(iterator, desc="Training anchor models", unit="model",
-                              bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]')
+                iterator = tqdm(
+                    iterator,
+                    desc="Training anchor models",
+                    unit="model",
+                    bar_format=(
+                        "{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]"
+                    ),
+                )
             for i in iterator:
-                path_boosting_models.append(wbu.train_pattern_boosting(input_for_parallelization[i]))
+                path_boosting_models.append(
+                    wbu.train_pattern_boosting(input_for_parallelization[i])
+                )
 
         else:
-
             with mp.get_context("spawn").Pool(number_of_cores_used) as pool:
-                path_boosting_models = pool.map(wbu.train_pattern_boosting, input_for_parallelization)
+                path_boosting_models = pool.map(
+                    wbu.train_pattern_boosting, input_for_parallelization
+                )
 
         self.models_list_ = path_boosting_models
         self.train_mse_ = self._compute_train_mse(
-            number_of_observations_for_each_model=[len(dataset) for dataset in train_datasets_for_each_anchor_label])
+            number_of_observations_for_each_model=[
+                len(dataset) for dataset in train_datasets_for_each_anchor_label
+            ]
+        )
 
         if eval_set is not None:
             self.mse_eval_set_ = []
             for eval_tuple in eval_set:
-                self.mse_eval_set_.append(self.evaluate(X=eval_tuple[0], y=eval_tuple[1]))
+                self.mse_eval_set_.append(
+                    self.evaluate(X=eval_tuple[0], y=eval_tuple[1])
+                )
 
         if self.parameters_variable_importance is not None:
             self.compute_variable_importance()
@@ -309,17 +370,24 @@ class PathBoost(BaseEstimator, RegressorMixin):
         return self
 
     def compute_variable_importance(self):
-        self.parameters_variable_importance['normalize'] = self.normalize_path_importance_
+        self.parameters_variable_importance["normalize"] = (
+            self.normalize_path_importance_
+        )
 
         self.variable_importance_ = VariableImportance_ForSequentialPathBoost(
-            **self.parameters_variable_importance, ).combine_variable_importance_from_list_of_sequential_models(
-            sequential_models=self.models_list_, )
+            **self.parameters_variable_importance,
+        ).combine_variable_importance_from_list_of_sequential_models(
+            sequential_models=self.models_list_,
+        )
 
     def _compute_train_mse(self, number_of_observations_for_each_model: list[int]):
         train_mse = np.zeros(self.n_iter)
         for i, smc_model in enumerate(self.models_list_):
             if smc_model is not None:
-                train_mse += np.array(smc_model.train_mse_) * number_of_observations_for_each_model[i]
+                train_mse += (
+                    np.array(smc_model.train_mse_)
+                    * number_of_observations_for_each_model[i]
+                )
         train_mse = train_mse / sum(number_of_observations_for_each_model)
         return train_mse
 
@@ -358,10 +426,13 @@ class PathBoost(BaseEstimator, RegressorMixin):
         X = self._validate_data(X=X)
 
         # divide the input by the anchor node
-        indexes_of_graphs_for_each_anchor_label: list[list[int]] = wbu.split_dataset_by_metal_centers(
-            graphs_list=X,
-            anchor_nodes_label_name=self.anchor_nodes_label_name_,
-            anchor_nodes=self.list_anchor_nodes_labels_)
+        indexes_of_graphs_for_each_anchor_label: list[list[int]] = (
+            wbu.split_dataset_by_metal_centers(
+                graphs_list=X,
+                anchor_nodes_label_name=self.anchor_nodes_label_name_,
+                anchor_nodes=self.list_anchor_nodes_labels_,
+            )
+        )
 
         # create the dataset for each anchor node
         datasets_for_each_anchor_label = []
@@ -370,37 +441,66 @@ class PathBoost(BaseEstimator, RegressorMixin):
             dataset = [X[index] for index in indexes]
             datasets_for_each_anchor_label.append(dataset)
 
-        number_of_effective_trained_models: int = sum(1 for model in self.models_list_ if model is not None)
-        number_of_dataset_to_be_predicted = sum(1 for dataset in datasets_for_each_anchor_label if len(dataset) != 0)
-        number_of_cores_used = min(mp.cpu_count(), self.n_of_cores, number_of_dataset_to_be_predicted,
-                                   number_of_effective_trained_models)
+        number_of_effective_trained_models: int = sum(
+            1 for model in self.models_list_ if model is not None
+        )
+        number_of_dataset_to_be_predicted = sum(
+            1 for dataset in datasets_for_each_anchor_label if len(dataset) != 0
+        )
+        number_of_cores_used = min(
+            mp.cpu_count(),
+            self.n_of_cores,
+            number_of_dataset_to_be_predicted,
+            number_of_effective_trained_models,
+        )
 
         if number_of_cores_used <= 1:
             predictions_for_each_anchor_node = []
             for i in range(len(datasets_for_each_anchor_label)):
                 if self.models_list_[i] is not None:
                     predictions = wbu.parallel_predict(
-                        input_from_parallelization=(self.models_list_[i], datasets_for_each_anchor_label[i]))
+                        input_from_parallelization=(
+                            self.models_list_[i],
+                            datasets_for_each_anchor_label[i],
+                        )
+                    )
                     predictions_for_each_anchor_node.append(predictions)
                 else:
                     predictions_for_each_anchor_node.append(None)
         else:
-            input_for_parallelization = list(zip(self.models_list_, datasets_for_each_anchor_label))
+            input_for_parallelization = list(
+                zip(self.models_list_, datasets_for_each_anchor_label)
+            )
             with mp.get_context("spawn").Pool(self.n_of_cores) as pool:
-                predictions_for_each_anchor_node = pool.map(wbu.parallel_predict, input_for_parallelization)
+                predictions_for_each_anchor_node = pool.map(
+                    wbu.parallel_predict, input_for_parallelization
+                )
 
         # create a matrix (list of lists) where the columns refer to the anchor nodes and the rows to the graphs
-        predictions_for_each_anchor_node_padded_with_none = [[None for _ in range(len(X))] for _ in
-                                                             range(len(self.list_anchor_nodes_labels_))]
+        predictions_for_each_anchor_node_padded_with_none = [
+            [None for _ in range(len(X))]
+            for _ in range(len(self.list_anchor_nodes_labels_))
+        ]
         for anchor_node_number in range(len(self.list_anchor_nodes_labels_)):
-            for i in range(len(indexes_of_graphs_for_each_anchor_label[anchor_node_number])):
-                graph_number = indexes_of_graphs_for_each_anchor_label[anchor_node_number][i]
-                predictions_for_each_anchor_node_padded_with_none[anchor_node_number][graph_number] = \
-                    predictions_for_each_anchor_node[anchor_node_number][i]
+            for i in range(
+                len(indexes_of_graphs_for_each_anchor_label[anchor_node_number])
+            ):
+                graph_number = indexes_of_graphs_for_each_anchor_label[
+                    anchor_node_number
+                ][i]
+                predictions_for_each_anchor_node_padded_with_none[anchor_node_number][
+                    graph_number
+                ] = predictions_for_each_anchor_node[anchor_node_number][i]
 
         # Transpose the list of lists, filling missing values with None
         transposed_list = list(
-            map(list, itertools.zip_longest(*predictions_for_each_anchor_node_padded_with_none, fillvalue=None)))
+            map(
+                list,
+                itertools.zip_longest(
+                    *predictions_for_each_anchor_node_padded_with_none, fillvalue=None
+                ),
+            )
+        )
 
         # Calculate the average of each row, ignoring None values
         predictions = []
@@ -415,7 +515,9 @@ class PathBoost(BaseEstimator, RegressorMixin):
                 avg = 0
             predictions.append(avg)
 
-        predictions = [x if x is not None and not np.isnan(x) else 0 for x in predictions]
+        predictions = [
+            x if x is not None and not np.isnan(x) else 0 for x in predictions
+        ]
 
         return predictions
 
@@ -446,10 +548,13 @@ class PathBoost(BaseEstimator, RegressorMixin):
         X = self._validate_data(X=X)
 
         # divide the input by the anchor node
-        indexes_of_graphs_for_each_anchor_label: list[list[int]] = wbu.split_dataset_by_metal_centers(
-            graphs_list=X,
-            anchor_nodes_label_name=self.anchor_nodes_label_name_,
-            anchor_nodes=self.list_anchor_nodes_labels_)
+        indexes_of_graphs_for_each_anchor_label: list[list[int]] = (
+            wbu.split_dataset_by_metal_centers(
+                graphs_list=X,
+                anchor_nodes_label_name=self.anchor_nodes_label_name_,
+                anchor_nodes=self.list_anchor_nodes_labels_,
+            )
+        )
 
         # create the dataset for each anchor node
         datasets_for_each_anchor_label = []
@@ -458,50 +563,88 @@ class PathBoost(BaseEstimator, RegressorMixin):
             dataset = [X[index] for index in indexes]
             datasets_for_each_anchor_label.append(dataset)
 
-        number_of_effective_trained_models: int = sum(1 for model in self.models_list_ if model is not None)
-        number_of_dataset_to_be_predicted = sum(1 for dataset in datasets_for_each_anchor_label if len(dataset) != 0)
-        number_of_cores_used = min(mp.cpu_count(), self.n_of_cores, number_of_dataset_to_be_predicted,
-                                   number_of_effective_trained_models)
+        number_of_effective_trained_models: int = sum(
+            1 for model in self.models_list_ if model is not None
+        )
+        number_of_dataset_to_be_predicted = sum(
+            1 for dataset in datasets_for_each_anchor_label if len(dataset) != 0
+        )
+        number_of_cores_used = min(
+            mp.cpu_count(),
+            self.n_of_cores,
+            number_of_dataset_to_be_predicted,
+            number_of_effective_trained_models,
+        )
 
         # get the step by step predictions for each anchor node
         if number_of_cores_used <= 1:
-            step_by_step_predictions_for_each_anchor_node: list[list[list[numbers.Number]]] = []
+            step_by_step_predictions_for_each_anchor_node: list[
+                list[list[numbers.Number]]
+            ] = []
             for i in range(len(datasets_for_each_anchor_label)):
                 if self.models_list_[i] is not None:
                     predictions_step_by_step = wbu.parallel_predict_step_by_step(
-                        (self.models_list_[i], datasets_for_each_anchor_label[i]))
-                    step_by_step_predictions_for_each_anchor_node.append(predictions_step_by_step)
+                        (self.models_list_[i], datasets_for_each_anchor_label[i])
+                    )
+                    step_by_step_predictions_for_each_anchor_node.append(
+                        predictions_step_by_step
+                    )
                 else:
                     step_by_step_predictions_for_each_anchor_node.append(None)
         else:
-            input_for_parallelization = list(zip(self.models_list_, datasets_for_each_anchor_label))
+            input_for_parallelization = list(
+                zip(self.models_list_, datasets_for_each_anchor_label)
+            )
             with mp.get_context("spawn").Pool(self.n_of_cores) as pool:
-                step_by_step_predictions_for_each_anchor_node: list[list[list[numbers.Number]]] = pool.map(
-                    wbu.parallel_predict_step_by_step, input_for_parallelization)
+                step_by_step_predictions_for_each_anchor_node: list[
+                    list[list[numbers.Number]]
+                ] = pool.map(
+                    wbu.parallel_predict_step_by_step, input_for_parallelization
+                )
 
         # create a matrix for each iteration (list of lists) where the columns refer to the anchor nodes and the rows to the graphs
         iterations_predictions_for_each_anchor_node_padded_with_none = []
         for iteration in range(self.n_iter):
-
-            predictions_for_each_anchor_node_padded_with_none = [[None for _ in range(len(X))] for _ in
-                                                                 range(len(self.list_anchor_nodes_labels_))]
+            predictions_for_each_anchor_node_padded_with_none = [
+                [None for _ in range(len(X))]
+                for _ in range(len(self.list_anchor_nodes_labels_))
+            ]
 
             for anchor_node_number in range(len(self.list_anchor_nodes_labels_)):
-                for i in range(len(indexes_of_graphs_for_each_anchor_label[anchor_node_number])):
-                    graph_number = indexes_of_graphs_for_each_anchor_label[anchor_node_number][i]
-                    predictions_for_each_anchor_node_padded_with_none[anchor_node_number][graph_number] = \
-                        step_by_step_predictions_for_each_anchor_node[anchor_node_number][iteration][i]
+                for i in range(
+                    len(indexes_of_graphs_for_each_anchor_label[anchor_node_number])
+                ):
+                    graph_number = indexes_of_graphs_for_each_anchor_label[
+                        anchor_node_number
+                    ][i]
+                    predictions_for_each_anchor_node_padded_with_none[
+                        anchor_node_number
+                    ][graph_number] = step_by_step_predictions_for_each_anchor_node[
+                        anchor_node_number
+                    ][
+                        iteration
+                    ][
+                        i
+                    ]
 
             iterations_predictions_for_each_anchor_node_padded_with_none.append(
-                predictions_for_each_anchor_node_padded_with_none)
+                predictions_for_each_anchor_node_padded_with_none
+            )
 
         transposed_iteration_predictions = []
         for iteration in range(self.n_iter):
             # Transpose the list of lists, filling missing values with None
             transposed_list = list(
-                map(list,
-                    itertools.zip_longest(*iterations_predictions_for_each_anchor_node_padded_with_none[iteration],
-                                          fillvalue=None)))
+                map(
+                    list,
+                    itertools.zip_longest(
+                        *iterations_predictions_for_each_anchor_node_padded_with_none[
+                            iteration
+                        ],
+                        fillvalue=None,
+                    ),
+                )
+            )
 
             transposed_iteration_predictions.append(transposed_list)
 
@@ -524,8 +667,12 @@ class PathBoost(BaseEstimator, RegressorMixin):
 
         return predictions_step_by_step
 
-    def _merge_values_from_single_path_boost(self, len_X: int, indexes_of_graphs_for_each_anchor_label: list[list[int]],
-                                             values_for_each_anchor_node: list[list[float]]):
+    def _merge_values_from_single_path_boost(
+        self,
+        len_X: int,
+        indexes_of_graphs_for_each_anchor_label: list[list[int]],
+        values_for_each_anchor_node: list[list[float]],
+    ):
         """
         This method is used to merge (average) the values (predictions) from a SingleMetalCenterPathBoost instance into the current instance of PathBoost
         """
@@ -534,19 +681,30 @@ class PathBoost(BaseEstimator, RegressorMixin):
         counter = [0 for _ in range(len_X)]
         for graph_number in range(len_X):
             for anchor_node_number in range(len(self.list_anchor_nodes_labels_)):
-                if graph_number in indexes_of_graphs_for_each_anchor_label[anchor_node_number]:
-                    graph_position_in_sub_dataset = indexes_of_graphs_for_each_anchor_label[anchor_node_number].index(
-                        graph_number)
-                    averaged_values[graph_number] += values_for_each_anchor_node[anchor_node_number][
-                        graph_position_in_sub_dataset]
+                if (
+                    graph_number
+                    in indexes_of_graphs_for_each_anchor_label[anchor_node_number]
+                ):
+                    graph_position_in_sub_dataset = (
+                        indexes_of_graphs_for_each_anchor_label[
+                            anchor_node_number
+                        ].index(graph_number)
+                    )
+                    averaged_values[graph_number] += values_for_each_anchor_node[
+                        anchor_node_number
+                    ][graph_position_in_sub_dataset]
                     counter[graph_number] += 1
 
-        averaged_values = np.divide(averaged_values, counter, out=np.zeros_like(averaged_values), where=counter != 0)
+        averaged_values = np.divide(
+            averaged_values,
+            counter,
+            out=np.zeros_like(averaged_values),
+            where=counter != 0,
+        )
 
         return averaged_values
 
     def evaluate(self, X: list[nx.Graph], y: Iterable) -> list[float]:
-
         # it returns the evolution of the mse with increasing number of iterations
         predictions = self.predict_step_by_step(X)
         evolution_mse = []
@@ -555,26 +713,45 @@ class PathBoost(BaseEstimator, RegressorMixin):
             evolution_mse.append(mse)
         return evolution_mse
 
-    def plot_training_and_eval_errors(self, skip_first_n_iterations: int | bool = True, plot_eval_sets_error=True,
-                                      show=True, save=False, save_path: str | None = None):
+    def plot_training_and_eval_errors(
+        self,
+        skip_first_n_iterations: int | bool = True,
+        plot_eval_sets_error=True,
+        show=True,
+        save=False,
+        save_path: str | None = None,
+    ):
         """
         Plots the training and evaluation set errors over iterations.
         """
-        if hasattr(self, 'mse_eval_set_') and plot_eval_sets_error is True:
+        if hasattr(self, "mse_eval_set_") and plot_eval_sets_error is True:
             eval_sets_mse = self.mse_eval_set_
         else:
             eval_sets_mse = None
-        plot_training_and_eval_errors(learning_rate=self.learning_rate, train_mse=self.train_mse_,
-                                      mse_eval_set=eval_sets_mse, skip_first_n_iterations=skip_first_n_iterations,
-                                      show=show, save=save, save_path=save_path)
+        plot_training_and_eval_errors(
+            learning_rate=self.learning_rate,
+            train_mse=self.train_mse_,
+            mse_eval_set=eval_sets_mse,
+            skip_first_n_iterations=skip_first_n_iterations,
+            show=show,
+            save=save,
+            save_path=save_path,
+        )
 
-    def plot_variable_importance(self, top_n_features: int | None = None, show: bool = True):
+    def plot_variable_importance(
+        self, top_n_features: int | None = None, show: bool = True
+    ):
         if self.parameters_variable_importance is None:
             raise ValueError(
-                "Variable importance is not computed. Please set parameters_variable_importance in the constructor.")
-        plot_variable_importance_utils(variable_importance=self.variable_importance_,
-                                       parameters_variable_importance=self.parameters_variable_importance,
-                                       top_n=top_n_features, show=show)
+                "Variable importance is not computed. Please set"
+                " parameters_variable_importance in the constructor."
+            )
+        plot_variable_importance_utils(
+            variable_importance=self.variable_importance_,
+            parameters_variable_importance=self.parameters_variable_importance,
+            top_n=top_n_features,
+            show=show,
+        )
 
     def score(self, X, y, sample_weight=None):
         # This method is used to evaluate the model on the given data.
@@ -584,28 +761,37 @@ class PathBoost(BaseEstimator, RegressorMixin):
         # - return the score
         mse_evolution = self.evaluate(X=X, y=y)
         best_mse = mse_evolution[-1]
-        return - best_mse
+        return -best_mse
 
     def _validate_data(
-            self,
-            X="no_validation",
-            y="no_validation",
-            reset=True,
-            validate_separately=False,
-            **check_params,
+        self,
+        X="no_validation",
+        y="no_validation",
+        reset=True,
+        validate_separately=False,
+        **check_params,
     ):
-
-        util_validate_data(model=self, X=X, y=y, reset=reset, validate_separately=validate_separately, **check_params)
+        util_validate_data(
+            model=self,
+            X=X,
+            y=y,
+            reset=reset,
+            validate_separately=validate_separately,
+            **check_params,
+        )
 
         if not np.array_equal(y, "no_validation"):
-            validate_data(self,
-                          X="no_validation",
-                          y=y,
-                          reset=reset,
-                          validate_separately=validate_separately
-                          )
+            validate_data(
+                self,
+                X="no_validation",
+                y=y,
+                reset=reset,
+                validate_separately=validate_separately,
+            )
 
-        if not np.array_equal(X, "no_validation") and not np.array_equal(y, "no_validation"):
+        if not np.array_equal(X, "no_validation") and not np.array_equal(
+            y, "no_validation"
+        ):
             return X, y
         elif not np.array_equal(X, "no_validation"):
             return X
@@ -616,13 +802,16 @@ class PathBoost(BaseEstimator, RegressorMixin):
         """
         Returns the evaluation set MSE if it was computed during fitting.
         """
-        if hasattr(self, 'mse_eval_set_'):
-            final_eval_set_mse= []
+        if hasattr(self, "mse_eval_set_"):
+            final_eval_set_mse = []
             for mse in self.mse_eval_set_:
                 final_eval_set_mse.append(mse[-1])
             return final_eval_set_mse
         else:
-            raise AttributeError("Evaluation set MSE is not available. Please fit the model with eval_set.")
+            raise AttributeError(
+                "Evaluation set MSE is not available. Please fit the model with"
+                " eval_set."
+            )
 
     def save(self, filepath: str) -> None:
         """
@@ -662,27 +851,27 @@ class PathBoost(BaseEstimator, RegressorMixin):
 
         # Create metadata dictionary
         metadata = {
-            'version': __version__,
-            'saved_at': datetime.now().isoformat(),
-            'n_iter': self.n_iter,
-            'max_path_length': self.max_path_length,
-            'learning_rate': self.learning_rate,
-            'anchor_nodes_label_name': self.anchor_nodes_label_name_,
-            'list_anchor_nodes_labels': self.list_anchor_nodes_labels_,
-            'n_models': len(self.models_list_),
+            "version": __version__,
+            "saved_at": datetime.now().isoformat(),
+            "n_iter": self.n_iter,
+            "max_path_length": self.max_path_length,
+            "learning_rate": self.learning_rate,
+            "anchor_nodes_label_name": self.anchor_nodes_label_name_,
+            "list_anchor_nodes_labels": self.list_anchor_nodes_labels_,
+            "n_models": len(self.models_list_),
         }
 
         # Package model and metadata
         save_dict = {
-            'model': self,
-            'metadata': metadata,
+            "model": self,
+            "metadata": metadata,
         }
 
         joblib.dump(save_dict, filepath)
         logger.info(f"Model saved to {filepath}")
 
     @classmethod
-    def load(cls, filepath: str) -> 'PathBoost':
+    def load(cls, filepath: str) -> "PathBoost":
         """
         Load a saved PathBoost model from a file.
 
@@ -732,30 +921,34 @@ class PathBoost(BaseEstimator, RegressorMixin):
         save_dict = joblib.load(filepath)
 
         # Validate the loaded object
-        if not isinstance(save_dict, dict) or 'model' not in save_dict:
+        if not isinstance(save_dict, dict) or "model" not in save_dict:
             raise ValueError(
-                f"Invalid model file. Expected a PathBoost save file, but got {type(save_dict)}"
+                "Invalid model file. Expected a PathBoost save file, but got"
+                f" {type(save_dict)}"
             )
 
-        model = save_dict['model']
-        metadata = save_dict.get('metadata', {})
+        model = save_dict["model"]
+        metadata = save_dict.get("metadata", {})
 
         # Check version compatibility
-        saved_version = metadata.get('version', 'unknown')
+        saved_version = metadata.get("version", "unknown")
         if saved_version != __version__:
             warnings.warn(
-                f"Model was saved with version {saved_version}, but current version is {__version__}. "
-                "Some features may not work correctly.",
-                UserWarning
+                (
+                    f"Model was saved with version {saved_version}, but current version"
+                    f" is {__version__}. Some features may not work correctly."
+                ),
+                UserWarning,
             )
 
-        logger.info(f"Model loaded from {filepath} (saved: {metadata.get('saved_at', 'unknown')})")
+        logger.info(
+            f"Model loaded from {filepath} (saved:"
+            f" {metadata.get('saved_at', 'unknown')})"
+        )
         return model
 
     def predict_with_uncertainty(
-        self,
-        X: List[nx.Graph],
-        confidence: float = 0.95
+        self, X: List[nx.Graph], confidence: float = 0.95
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Predict target values with uncertainty estimates using anchor node bootstrap.
@@ -830,7 +1023,7 @@ class PathBoost(BaseEstimator, RegressorMixin):
         n_effective_models = sum(1 for m in self.models_list_ if m is not None)
         if n_effective_models < 2:
             raise ValueError(
-                f"predict_with_uncertainty requires at least 2 trained anchor models, "
+                "predict_with_uncertainty requires at least 2 trained anchor models, "
                 f"but only {n_effective_models} model(s) were trained. "
                 "Use predict() for standard predictions."
             )
@@ -838,10 +1031,12 @@ class PathBoost(BaseEstimator, RegressorMixin):
         X = self._validate_data(X=X)
 
         # Get predictions from each anchor model separately
-        indexes_of_graphs_for_each_anchor_label: List[List[int]] = wbu.split_dataset_by_metal_centers(
-            graphs_list=X,
-            anchor_nodes_label_name=self.anchor_nodes_label_name_,
-            anchor_nodes=self.list_anchor_nodes_labels_
+        indexes_of_graphs_for_each_anchor_label: List[List[int]] = (
+            wbu.split_dataset_by_metal_centers(
+                graphs_list=X,
+                anchor_nodes_label_name=self.anchor_nodes_label_name_,
+                anchor_nodes=self.list_anchor_nodes_labels_,
+            )
         )
 
         # Create datasets for each anchor node
@@ -852,9 +1047,13 @@ class PathBoost(BaseEstimator, RegressorMixin):
             datasets_for_each_anchor_label.append(dataset)
 
         # Get predictions from each model
-        predictions_matrix = np.full((len(X), len(self.list_anchor_nodes_labels_)), np.nan)
+        predictions_matrix = np.full(
+            (len(X), len(self.list_anchor_nodes_labels_)), np.nan
+        )
 
-        for anchor_idx, (model, dataset) in enumerate(zip(self.models_list_, datasets_for_each_anchor_label)):
+        for anchor_idx, (model, dataset) in enumerate(
+            zip(self.models_list_, datasets_for_each_anchor_label)
+        ):
             if model is not None and len(dataset) > 0:
                 preds = model.predict(dataset)
                 graph_indices = indexes_of_graphs_for_each_anchor_label[anchor_idx]

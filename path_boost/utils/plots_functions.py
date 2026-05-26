@@ -5,37 +5,43 @@ from datetime import datetime
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-logger = logging.getLogger('path_boost')
+logger = logging.getLogger("path_boost")
 
 
-def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
-                                  mse_eval_set: list | None = None, skip_first_n_iterations: int | bool = False,
-                                  show=True, save=False, save_path: str | None = None):
+def plot_training_and_eval_errors(
+    learning_rate: float,
+    train_mse: list,
+    mse_eval_set: list | None = None,
+    skip_first_n_iterations: int | bool = False,
+    show=True,
+    save=False,
+    save_path: str | None = None,
+):
     """
-        Plots the training Mean Squared Error (MSE) and, if given, the MSE for multiple
-        evaluation sets over the boosting iterations.
+    Plots the training Mean Squared Error (MSE) and, if given, the MSE for multiple
+    evaluation sets over the boosting iterations.
 
-        Parameters
-        ----------
-        learning_rate : float
-            The learning rate used during training, used to adjust the x-axis.
-        train_mse : list[float]
-            A list of training MSE values, where each element corresponds to an iteration.
-        mse_eval_set : list[list[float]] | None, default=None
-            A list of lists, where each inner list contains MSE values for an evaluation
-            set over iterations. If None, only training MSE is plotted.
-        skip_first_n_iterations : int | bool, default=True
-            If True, the first iteration's errors are skipped in the plot (often an outlier).
-            If an integer, that many initial iterations are skipped.
-            If False or 0, all iterations are plotted.
-        show : bool, default=True
-            If True, the plot is displayed.
-        save : bool, default=False
-            If True, the plot is saved to a file.
-        save_path : str | None, default=None
-            The directory where the plot will be saved. If None, the current
-            working directory is used.
-        """
+    Parameters
+    ----------
+    learning_rate : float
+        The learning rate used during training, used to adjust the x-axis.
+    train_mse : list[float]
+        A list of training MSE values, where each element corresponds to an iteration.
+    mse_eval_set : list[list[float]] | None, default=None
+        A list of lists, where each inner list contains MSE values for an evaluation
+        set over iterations. If None, only training MSE is plotted.
+    skip_first_n_iterations : int | bool, default=True
+        If True, the first iteration's errors are skipped in the plot (often an outlier).
+        If an integer, that many initial iterations are skipped.
+        If False or 0, all iterations are plotted.
+    show : bool, default=True
+        If True, the plot is displayed.
+    save : bool, default=False
+        If True, the plot is saved to a file.
+    save_path : str | None, default=None
+        The directory where the plot will be saved. If None, the current
+        working directory is used.
+    """
     # skip_the_first n iterations
     if isinstance(skip_first_n_iterations, bool):
         if skip_first_n_iterations:
@@ -53,7 +59,7 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
     plt.figure(figsize=(12, 6))
 
     # Plot training errors
-    plt.plot(range(n, len(train_mse) + n), train_mse, label='Training Error', marker='')
+    plt.plot(range(n, len(train_mse) + n), train_mse, label="Training Error", marker="")
 
     # Plot evaluation set errors if available
     if mse_eval_set is not None:
@@ -66,12 +72,16 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
         num_eval_sets = len(eval_set_mse)
         for eval_set_index in range(num_eval_sets):
             if eval_set_mse[eval_set_index][0] is not None:
-                plt.plot(range(n, num_iterations + n), eval_set_mse[eval_set_index],
-                         label=f'Evaluation Set {eval_set_index + 1}', marker='')
-    
-    plt.xlabel('Iteration')
-    plt.ylabel('Mean Squared Error')
-    plt.title('Training and Evaluation Set Errors Over Iterations')
+                plt.plot(
+                    range(n, num_iterations + n),
+                    eval_set_mse[eval_set_index],
+                    label=f"Evaluation Set {eval_set_index + 1}",
+                    marker="",
+                )
+
+    plt.xlabel("Iteration")
+    plt.ylabel("Mean Squared Error")
+    plt.title("Training and Evaluation Set Errors Over Iterations")
     plt.legend()
     plt.grid(True)
 
@@ -81,7 +91,7 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
     if save:
         now = datetime.now()
         timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f'training_and_eval_errors_{timestamp}.png'
+        filename = f"training_and_eval_errors_{timestamp}.png"
         if save_path:
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
@@ -93,9 +103,12 @@ def plot_training_and_eval_errors(learning_rate: float, train_mse: list,
         plt.show()
 
 
-
-
-def plot_variable_importance_utils(variable_importance: dict, parameters_variable_importance: dict, top_n: int | None = None, show: bool = True):
+def plot_variable_importance_utils(
+    variable_importance: dict,
+    parameters_variable_importance: dict,
+    top_n: int | None = None,
+    show: bool = True,
+):
     """
     Plots the variable importance scores.
 
@@ -116,19 +129,24 @@ def plot_variable_importance_utils(variable_importance: dict, parameters_variabl
         If True, the plot is displayed.
     """
 
-    assert isinstance(variable_importance, dict), "Variable importance should be a dictionary."
+    assert isinstance(
+        variable_importance, dict
+    ), "Variable importance should be a dictionary."
     sorted_items = sorted(variable_importance.items(), key=lambda x: x[1], reverse=True)
     if top_n is not None:
         sorted_items = sorted_items[:top_n]
     labels, values = zip(*sorted_items)
 
     # Convert tuples in labels to strings
-    labels = [",".join(map(str, label)) if isinstance(label, tuple) else str(label) for label in labels]
+    labels = [
+        ",".join(map(str, label)) if isinstance(label, tuple) else str(label)
+        for label in labels
+    ]
 
     plt.figure(figsize=(10, 6))
-    plt.barh(labels, values, color='skyblue')
-    plt.xlabel('Importance Score')
-    plt.title(parameters_variable_importance['criterion'] + ' Variable Importance')
+    plt.barh(labels, values, color="skyblue")
+    plt.xlabel("Importance Score")
+    plt.title(parameters_variable_importance["criterion"] + " Variable Importance")
     plt.gca().invert_yaxis()
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
     if show:

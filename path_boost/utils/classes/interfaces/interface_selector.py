@@ -18,7 +18,10 @@ class SelectorClassInterface(metaclass=abc.ABCMeta):
     @classmethod
     def __subclasshook__(cls, C):
         if cls is SelectorClassInterface:
-            if any("fit" in B.__dict__ for B in C.__mro__) and any("predict" in B.__dict__ for B in C.__mro__) and any(
-                    "feature_importances_" in B.__dict__ for B in C.__mro__):
+            if (
+                any("fit" in B.__dict__ for B in C.__mro__)
+                and any("predict" in B.__dict__ for B in C.__mro__)
+                and any("feature_importances_" in B.__dict__ for B in C.__mro__)
+            ):
                 return True
         return NotImplemented

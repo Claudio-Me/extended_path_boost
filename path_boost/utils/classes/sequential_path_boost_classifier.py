@@ -6,13 +6,18 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-logger = logging.getLogger('path_boost')
+logger = logging.getLogger("path_boost")
 
 from .interfaces.interface_base_learner import BaseLearnerClassInterface
 from .interfaces.interface_selector import SelectorClassInterface
 from ..validate_data import util_validate_data
-from ..variable_importance_according_to_path_boost import VariableImportance_ForSequentialPathBoost
-from ..plots_functions import plot_training_and_eval_errors, plot_variable_importance_utils
+from ..variable_importance_according_to_path_boost import (
+    VariableImportance_ForSequentialPathBoost,
+)
+from ..plots_functions import (
+    plot_training_and_eval_errors,
+    plot_variable_importance_utils,
+)
 
 from sklearn.base import BaseEstimator
 from sklearn.base import RegressorMixin
@@ -25,62 +30,65 @@ from matplotlib.ticker import MaxNLocator
 
 
 class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
-    def __init__(self, n_iter=100,
-                 max_path_length=10,
-                 learning_rate=0.1,
-                 patience=None,
-                 target_error=None,
-                 BaseLearnerClass=DecisionTreeRegressor,
-                 kwargs_for_base_learner=None,
-                 SelectorClass=DecisionTreeRegressor,
-                 kwargs_for_selector=None,
-                 parameters_variable_importance=None,
-                 replace_nan_with=np.nan,
-                 verbose=False,
-                 use_tree_boost=False):
+    def __init__(
+        self,
+        n_iter=100,
+        max_path_length=10,
+        learning_rate=0.1,
+        patience=None,
+        target_error=None,
+        BaseLearnerClass=DecisionTreeRegressor,
+        kwargs_for_base_learner=None,
+        SelectorClass=DecisionTreeRegressor,
+        kwargs_for_selector=None,
+        parameters_variable_importance=None,
+        replace_nan_with=np.nan,
+        verbose=False,
+        use_tree_boost=False,
+    ):
         """
-              Initializes the SequentialPathBoost model.
+        Initializes the SequentialPathBoost model.
 
-              Parameters
-              ----------
-              n_iter : int, default=100
-                  The number of boosting iterations to perform.
-              max_path_length : int, default=10
-                  The maximum length of paths to consider as features. Paths longer
-                  than this will not be explored for extending the Extended Boosting Matrix (EBM).
-              learning_rate : float, default=0.1
-                  The learning_rate shrinks the contribution of each base learner.
-                  It is used by the `AdditiveModelWrapperClassifier` when fitting each step.
-              patience : int, optional, default=None
-                  Number of iterations with no improvement on the first evaluation set's score
-                  before stopping early. If None, early stopping is not performed.
-                  Requires an `eval_set` to be provided during fitting. The check is performed
-                  based on the Mean Squared Error (MSE) of the first evaluation set in `eval_set`.
-              BaseLearnerClass : type, default=sklearn.tree.DecisionTreeRegressor
-                  The class of the base learner to be used within each boosting iteration.
-                  This class must implement the `BaseLearnerClassInterface`.
-              kwargs_for_base_learner : dict, default=None
-                  Keyword arguments to be passed to the constructor of the `BaseLearnerClass`.
-                  If None, default arguments for `DecisionTreeRegressor` will be used.
-              SelectorClass : type, default=sklearn.tree.DecisionTreeRegressor
-                  The class of the feature selector used to identify the best paths in each iteration.
-                  This class must implement the `SelectorClassInterface`.
-              kwargs_for_selector : dict, default=None
-                  Keyword arguments to be passed to the constructor of the `SelectorClass`.
-                  If None, default arguments for `DecisionTreeRegressor` will be used.
-              parameters_variable_importance : dict, default=None
-                  Parameters for computing variable importance. If None, variable importance is not computed.
-                  Expected keys include 'criterion', 'error_used', 'use_correlation', 'normalize'.
-              replace_nan_with : any, default=np.nan
-                  Value used to replace NaN values encountered during feature generation in the EBM.
-                  This is important for base learners that cannot handle NaN values.
-              verbose : bool, default=False
-                  If True, prints progress messages during the fitting process, such as the
-                  current iteration number and the best path selected.
-              use_tree_boost : bool, default=False
-                  If True, uses the TreeBoost modification in the base learner, optimizing
-                  separate gamma values for each leaf region. This requires the `BaseLearnerClass`
-                  to support this functionality.
+        Parameters
+        ----------
+        n_iter : int, default=100
+            The number of boosting iterations to perform.
+        max_path_length : int, default=10
+            The maximum length of paths to consider as features. Paths longer
+            than this will not be explored for extending the Extended Boosting Matrix (EBM).
+        learning_rate : float, default=0.1
+            The learning_rate shrinks the contribution of each base learner.
+            It is used by the `AdditiveModelWrapperClassifier` when fitting each step.
+        patience : int, optional, default=None
+            Number of iterations with no improvement on the first evaluation set's score
+            before stopping early. If None, early stopping is not performed.
+            Requires an `eval_set` to be provided during fitting. The check is performed
+            based on the Mean Squared Error (MSE) of the first evaluation set in `eval_set`.
+        BaseLearnerClass : type, default=sklearn.tree.DecisionTreeRegressor
+            The class of the base learner to be used within each boosting iteration.
+            This class must implement the `BaseLearnerClassInterface`.
+        kwargs_for_base_learner : dict, default=None
+            Keyword arguments to be passed to the constructor of the `BaseLearnerClass`.
+            If None, default arguments for `DecisionTreeRegressor` will be used.
+        SelectorClass : type, default=sklearn.tree.DecisionTreeRegressor
+            The class of the feature selector used to identify the best paths in each iteration.
+            This class must implement the `SelectorClassInterface`.
+        kwargs_for_selector : dict, default=None
+            Keyword arguments to be passed to the constructor of the `SelectorClass`.
+            If None, default arguments for `DecisionTreeRegressor` will be used.
+        parameters_variable_importance : dict, default=None
+            Parameters for computing variable importance. If None, variable importance is not computed.
+            Expected keys include 'criterion', 'error_used', 'use_correlation', 'normalize'.
+        replace_nan_with : any, default=np.nan
+            Value used to replace NaN values encountered during feature generation in the EBM.
+            This is important for base learners that cannot handle NaN values.
+        verbose : bool, default=False
+            If True, prints progress messages during the fitting process, such as the
+            current iteration number and the best path selected.
+        use_tree_boost : bool, default=False
+            If True, uses the TreeBoost modification in the base learner, optimizing
+            separate gamma values for each leaf region. This requires the `BaseLearnerClass`
+            to support this functionality.
         """
         self.n_iter = n_iter
         self.max_path_length = max_path_length
@@ -96,8 +104,14 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
         self.parameters_variable_importance = parameters_variable_importance
         self.use_tree_boost = use_tree_boost
 
-    def fit(self, X: list[nx.Graph], y: np.array, list_anchor_nodes_labels: list[tuple], anchor_nodes_label_name,
-            eval_set: list[tuple[list[nx.Graph], Iterable]] = None):
+    def fit(
+        self,
+        X: list[nx.Graph],
+        y: np.array,
+        list_anchor_nodes_labels: list[tuple],
+        anchor_nodes_label_name,
+        eval_set: list[tuple[list[nx.Graph], Iterable]] = None,
+    ):
         """
         Fits the SequentialPathBoost model to the training data.
 
@@ -145,41 +159,51 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
 
         # Configure logging based on verbose flag
         if self.verbose:
-            logging.getLogger('path_boost').setLevel(logging.INFO)
-            if not logging.getLogger('path_boost').handlers:
+            logging.getLogger("path_boost").setLevel(logging.INFO)
+            if not logging.getLogger("path_boost").handlers:
                 handler = logging.StreamHandler()
-                handler.setFormatter(logging.Formatter('%(message)s'))
-                logging.getLogger('path_boost').addHandler(handler)
+                handler.setFormatter(logging.Formatter("%(message)s"))
+                logging.getLogger("path_boost").addHandler(handler)
 
-        self._default_kwargs_for_base_learner = {'max_depth': 3,
-                                                 'random_state': 0,
-                                                 'splitter': 'best',
-                                                 }
+        self._default_kwargs_for_base_learner = {
+            "max_depth": 3,
+            "random_state": 0,
+            "splitter": "best",
+        }
 
-        self._default_kwargs_for_selector = {'max_depth': 1,
-                                             'random_state': 0,
-                                             'splitter': 'best',
-                                             'criterion': "squared_error"
-                                             }
+        self._default_kwargs_for_selector = {
+            "max_depth": 1,
+            "random_state": 0,
+            "splitter": "best",
+            "criterion": "squared_error",
+        }
 
-        self._validate_data(X=X, y=y, list_anchor_nodes_labels=list_anchor_nodes_labels,
-                            name_of_label_attribute=anchor_nodes_label_name, eval_set=eval_set,
-                            parameters_variable_importance=self.parameters_variable_importance,
-                            patience=self.patience)
+        self._validate_data(
+            X=X,
+            y=y,
+            list_anchor_nodes_labels=list_anchor_nodes_labels,
+            name_of_label_attribute=anchor_nodes_label_name,
+            eval_set=eval_set,
+            parameters_variable_importance=self.parameters_variable_importance,
+            patience=self.patience,
+        )
 
         self.is_fitted_ = True
 
         self.name_of_label_attribute_ = anchor_nodes_label_name
 
         self.paths_selected_by_epb_ = set()
-        self._initialize_path_boosting(X=X,
-                                       list_anchor_nodes_labels=list_anchor_nodes_labels,
-                                       main_label_name=anchor_nodes_label_name,
-                                       eval_set=eval_set)
+        self._initialize_path_boosting(
+            X=X,
+            list_anchor_nodes_labels=list_anchor_nodes_labels,
+            main_label_name=anchor_nodes_label_name,
+            eval_set=eval_set,
+        )
 
         if self.parameters_variable_importance is not None:
             self.class_variable_importance_: VariableImportance_ForSequentialPathBoost = VariableImportance_ForSequentialPathBoost(
-                **self.parameters_variable_importance)
+                **self.parameters_variable_importance
+            )
 
         for n_iteration in range(self.n_iter):
             if self.verbose:
@@ -189,18 +213,25 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
             self._ebm_has_been_expanded_in_this_iteration = False
 
             if n_iteration == 0:
-                best_path = self._find_best_path(train_ebm_dataframe=self.train_ebm_dataframe_,
-                                                 y=y,
-                                                 SelectorClass=self.SelectorClass,
-                                                 kwargs_for_selector=self.kwargs_for_selector)
+                best_path = self._find_best_path(
+                    train_ebm_dataframe=self.train_ebm_dataframe_,
+                    y=y,
+                    SelectorClass=self.SelectorClass,
+                    kwargs_for_selector=self.kwargs_for_selector,
+                )
             else:
-
-                negative_gradient = AdditiveModelWrapperClassifier._neg_gradient(y=y, y_hat=np.array(
-                    self.base_learner_._last_train_prediction.to_numpy()))
-                best_path = self._find_best_path(train_ebm_dataframe=self.train_ebm_dataframe_,
-                                                 y=pd.Series(negative_gradient),
-                                                 SelectorClass=self.SelectorClass,
-                                                 kwargs_for_selector=self.kwargs_for_selector)
+                negative_gradient = AdditiveModelWrapperClassifier._neg_gradient(
+                    y=y,
+                    y_hat=np.array(
+                        self.base_learner_._last_train_prediction.to_numpy()
+                    ),
+                )
+                best_path = self._find_best_path(
+                    train_ebm_dataframe=self.train_ebm_dataframe_,
+                    y=pd.Series(negative_gradient),
+                    SelectorClass=self.SelectorClass,
+                    kwargs_for_selector=self.kwargs_for_selector,
+                )
 
             if self.verbose:
                 logger.info(f"Best path: {best_path}")
@@ -209,39 +240,62 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
             # selection of the best path and the expansion of the ebm dataframe
             if self.parameters_variable_importance is not None:
                 if n_iteration == 0:
-                    self.class_variable_importance_._update(path_boost=self, selected_path=best_path,
-                                                            iteration_number=n_iteration, gradient=y)
+                    self.class_variable_importance_._update(
+                        path_boost=self,
+                        selected_path=best_path,
+                        iteration_number=n_iteration,
+                        gradient=y,
+                    )
                 else:
-                    self.class_variable_importance_._update(path_boost=self, selected_path=best_path,
-                                                            iteration_number=n_iteration, gradient=negative_gradient)
+                    self.class_variable_importance_._update(
+                        path_boost=self,
+                        selected_path=best_path,
+                        iteration_number=n_iteration,
+                        gradient=negative_gradient,
+                    )
 
             # expand the EVAL set in order to contain the selected columns path
-            self._expand_eval_ebm_dataframe_with_best_path(best_path=best_path, main_label_name=anchor_nodes_label_name,
-                                                           eval_set=eval_set)
+            self._expand_eval_ebm_dataframe_with_best_path(
+                best_path=best_path,
+                main_label_name=anchor_nodes_label_name,
+                eval_set=eval_set,
+            )
 
-            self.base_learner_.fit_one_step(X=self.train_ebm_dataframe_, y=y, best_path=best_path,
-                                            eval_set=self.eval_set_ebm_df_and_target_)
+            self.base_learner_.fit_one_step(
+                X=self.train_ebm_dataframe_,
+                y=y,
+                best_path=best_path,
+                eval_set=self.eval_set_ebm_df_and_target_,
+            )
 
             if eval_set is not None:
-
-                if self._check_if_stop_early(mse_eval_set=self.base_learner_.eval_sets_logloss[0],
-                                             patience=self.patience,
-                                             target_error=self.target_error):
+                if self._check_if_stop_early(
+                    mse_eval_set=self.base_learner_.eval_sets_logloss[0],
+                    patience=self.patience,
+                    target_error=self.target_error,
+                ):
                     if self.verbose:
                         logger.info(
-                            f"Early stopping at iteration {n_iteration + 1} due to no improvement in evaluation set logloss.")
+                            f"Early stopping at iteration {n_iteration + 1} due to no"
+                            " improvement in evaluation set logloss."
+                        )
                         self.n_iter = n_iteration
                     break
 
             # expand the ebm dataframe with the new columns starting from the selected path
-            self._expand_ebm_dataframe(X=X, selected_path=best_path, main_label_name=anchor_nodes_label_name)
+            self._expand_ebm_dataframe(
+                X=X, selected_path=best_path, main_label_name=anchor_nodes_label_name
+            )
 
         self.train_logloss_ = self.base_learner_.train_logloss
         self.train_accuracy_ = self.base_learner_.train_accuracy
 
         if self.parameters_variable_importance is not None:
-            self.variable_importance_: dict = self.class_variable_importance_.compute_variable_importance(
-                path_boost=self)
+            self.variable_importance_: dict = (
+                self.class_variable_importance_.compute_variable_importance(
+                    path_boost=self
+                )
+            )
 
         if eval_set is not None:
             self.eval_sets_logloss_ = self.base_learner_.eval_sets_logloss
@@ -251,8 +305,12 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
 
         return self
 
-    def _check_if_stop_early(self, mse_eval_set: list[float], patience: int | None = None,
-                             target_error: float | None = None) -> bool:
+    def _check_if_stop_early(
+        self,
+        mse_eval_set: list[float],
+        patience: int | None = None,
+        target_error: float | None = None,
+    ) -> bool:
         """
         Determines whether to stop the training process early based on evaluation metrics.
 
@@ -301,76 +359,98 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
         # Check if the last `patience` MSE values are all greater than or equal to the last MSE value
         return all(mse >= mse_eval_set[-1] for mse in mse_eval_set[-patience:])
 
-    def _expand_eval_ebm_dataframe_with_best_path(self, best_path, main_label_name, eval_set=None):
+    def _expand_eval_ebm_dataframe_with_best_path(
+        self, best_path, main_label_name, eval_set=None
+    ):
         # we expand the ebm dataframe ONLY by adding the new columns related to the best path, we are not exploring new paths
         if eval_set is not None:
-            columns_names = ExtendedBoostingMatrix.get_columns_related_to_path(best_path,
-                                                                               self.train_ebm_dataframe_.columns)
+            columns_names = ExtendedBoostingMatrix.get_columns_related_to_path(
+                best_path, self.train_ebm_dataframe_.columns
+            )
             for eval_set_number, eval_set_tuple in enumerate(eval_set):
                 if eval_set_tuple is None:
                     continue
                 eval_set_dataset, y_eval_set = eval_set_tuple
                 # find the new columns in the eval set
-                missing_columns = [col for col in columns_names if
-                                   col not in self.eval_set_ebm_df_and_target_[eval_set_number][0].columns]
-                new_columns_for_eval_set = ExtendedBoostingMatrix.generate_new_columns_from_columns_names(
-                    dataset=eval_set_dataset,
-                    ebm_to_be_expanded=self.eval_set_ebm_df_and_target_[eval_set_number][0],
-                    columns_names=missing_columns,
-                    main_label_name=main_label_name,
-                    replace_nan_with=self.replace_nan_with)
+                missing_columns = [
+                    col
+                    for col in columns_names
+                    if col
+                    not in self.eval_set_ebm_df_and_target_[eval_set_number][0].columns
+                ]
+                new_columns_for_eval_set = (
+                    ExtendedBoostingMatrix.generate_new_columns_from_columns_names(
+                        dataset=eval_set_dataset,
+                        ebm_to_be_expanded=self.eval_set_ebm_df_and_target_[
+                            eval_set_number
+                        ][0],
+                        columns_names=missing_columns,
+                        main_label_name=main_label_name,
+                        replace_nan_with=self.replace_nan_with,
+                    )
+                )
                 self.eval_set_ebm_df_and_target_[eval_set_number][0] = pd.concat(
-                    [self.eval_set_ebm_df_and_target_[eval_set_number][0], new_columns_for_eval_set], axis=1)
+                    [
+                        self.eval_set_ebm_df_and_target_[eval_set_number][0],
+                        new_columns_for_eval_set,
+                    ],
+                    axis=1,
+                )
 
     def generate_ebm_for_dataset(self, dataset: list[nx.Graph], columns_names=None):
         """
-           Generates an Extended Boosting Matrix (EBM) for a given dataset of graphs.
+        Generates an Extended Boosting Matrix (EBM) for a given dataset of graphs.
 
-           The EBM is a pandas DataFrame where rows correspond to graphs and columns
-           correspond to features derived from paths in the graphs. If `columns_names`
-           is provided, the EBM will only contain these columns. Otherwise, it will
-           include columns related to all paths selected during the fitting process
-           (stored in `self.paths_selected_by_epb_` and `self.columns_names_`).
+        The EBM is a pandas DataFrame where rows correspond to graphs and columns
+        correspond to features derived from paths in the graphs. If `columns_names`
+        is provided, the EBM will only contain these columns. Otherwise, it will
+        include columns related to all paths selected during the fitting process
+        (stored in `self.paths_selected_by_epb_` and `self.columns_names_`).
 
-           Parameters
-           ----------
-           dataset : list[nx.Graph]
-               A list of NetworkX graph objects for which to generate the EBM.
-           columns_names : list[str], optional
-               A list of column names to include in the generated EBM. If None,
-               columns are determined by the paths selected during fitting.
-               Defaults to None.
+        Parameters
+        ----------
+        dataset : list[nx.Graph]
+            A list of NetworkX graph objects for which to generate the EBM.
+        columns_names : list[str], optional
+            A list of column names to include in the generated EBM. If None,
+            columns are determined by the paths selected during fitting.
+            Defaults to None.
 
-           Returns
-           -------
-           pd.DataFrame
-               The generated Extended Boosting Matrix.
+        Returns
+        -------
+        pd.DataFrame
+            The generated Extended Boosting Matrix.
 
-           Raises
-           ------
-           AssertionError
-               If the model has not been fitted yet (i.e., `self.is_fitted_` is False).
-           """
+        Raises
+        ------
+        AssertionError
+            If the model has not been fitted yet (i.e., `self.is_fitted_` is False).
+        """
 
         assert self.is_fitted_
         if columns_names is None:
-
             selected_path = list(self.paths_selected_by_epb_)
             columns_names = []
             for path in selected_path:
-                columns_names += ExtendedBoostingMatrix.get_columns_related_to_path(path=path,
-                                                                                    columns_names=self.columns_names_)
+                columns_names += ExtendedBoostingMatrix.get_columns_related_to_path(
+                    path=path, columns_names=self.columns_names_
+                )
         columns_names = list(set(columns_names))
-        ebm_dataframe = ExtendedBoostingMatrix.generate_new_columns_from_columns_names(dataset=dataset,
-                                                                                       columns_names=columns_names,
-                                                                                       main_label_name=self.name_of_label_attribute_,
-                                                                                       replace_nan_with=self.replace_nan_with)
+        ebm_dataframe = ExtendedBoostingMatrix.generate_new_columns_from_columns_names(
+            dataset=dataset,
+            columns_names=columns_names,
+            main_label_name=self.name_of_label_attribute_,
+            replace_nan_with=self.replace_nan_with,
+        )
 
         return ebm_dataframe
 
-    def predict(self, X: list[nx.Graph] | nx.Graph | None = None, ebm_dataframe: pd.DataFrame | None = None,
-                class_probability: bool = False) -> list[
-        numbers.Number]:
+    def predict(
+        self,
+        X: list[nx.Graph] | nx.Graph | None = None,
+        ebm_dataframe: pd.DataFrame | None = None,
+        class_probability: bool = False,
+    ) -> list[numbers.Number]:
         """
         Predicts target values for the given input data.
 
@@ -404,11 +484,16 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
             if isinstance(X, nx.Graph):
                 X = [X]
             ebm_dataframe = self.generate_ebm_for_dataset(dataset=X)
-        return self.base_learner_.predict(X=ebm_dataframe, class_probability=class_probability)
+        return self.base_learner_.predict(
+            X=ebm_dataframe, class_probability=class_probability
+        )
 
-    def predict_step_by_step(self, X: list[nx.Graph] | nx.Graph | None = None,
-                             ebm_dataframe: pd.DataFrame | None = None, class_probability: bool = False) -> list[
-        np.array]:
+    def predict_step_by_step(
+        self,
+        X: list[nx.Graph] | nx.Graph | None = None,
+        ebm_dataframe: pd.DataFrame | None = None,
+        class_probability: bool = False,
+    ) -> list[np.array]:
         """
         Generates predictions for each input sample at each boosting iteration.
 
@@ -447,9 +532,16 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
             if isinstance(X, nx.Graph):
                 X = [X]
             ebm_dataframe = self.generate_ebm_for_dataset(dataset=X)
-        return self.base_learner_.predict_step_by_step(X=ebm_dataframe, class_probability=class_probability)
+        return self.base_learner_.predict_step_by_step(
+            X=ebm_dataframe, class_probability=class_probability
+        )
 
-    def evaluate(self, X: list[nx.Graph] | nx.Graph | None = None, y=None, ebm_dataframe: pd.DataFrame | None = None):
+    def evaluate(
+        self,
+        X: list[nx.Graph] | nx.Graph | None = None,
+        y=None,
+        ebm_dataframe: pd.DataFrame | None = None,
+    ):
         """
         Evaluates the model on the given dataset and returns the Mean Squared Error (MSE) for each iteration.
 
@@ -487,7 +579,9 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
             ebm_dataframe = self.generate_ebm_for_dataset(dataset=X)
         return self.base_learner_.evaluate(ebm_dataframe, y)
 
-    def _expand_ebm_dataframe(self, X: list[nx.Graph], selected_path, main_label_name: str):
+    def _expand_ebm_dataframe(
+        self, X: list[nx.Graph], selected_path, main_label_name: str
+    ):
         self._ebm_has_been_expanded_in_this_iteration = True
         if selected_path in self.paths_selected_by_epb_:
             return
@@ -495,16 +589,26 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
             self.paths_selected_by_epb_.add(selected_path)
         else:
             self.paths_selected_by_epb_.add(selected_path)
-            new_columns = ExtendedBoostingMatrix.new_columns_to_expand_ebm_dataframe_with_path(dataset=X,
-                                                                                               selected_path=selected_path,
-                                                                                               main_label_name=main_label_name,
-                                                                                               df_to_be_expanded=self.train_ebm_dataframe_,
-                                                                                               replace_nan_with=self.replace_nan_with)
-            self.train_ebm_dataframe_ = pd.concat([self.train_ebm_dataframe_, new_columns], axis=1)
+            new_columns = (
+                ExtendedBoostingMatrix.new_columns_to_expand_ebm_dataframe_with_path(
+                    dataset=X,
+                    selected_path=selected_path,
+                    main_label_name=main_label_name,
+                    df_to_be_expanded=self.train_ebm_dataframe_,
+                    replace_nan_with=self.replace_nan_with,
+                )
+            )
+            self.train_ebm_dataframe_ = pd.concat(
+                [self.train_ebm_dataframe_, new_columns], axis=1
+            )
 
-    def _initialize_path_boosting(self, X, list_anchor_nodes_labels: list, main_label_name: str,
-                                  eval_set: list[tuple[list[nx.Graph], Iterable]] = None):
-
+    def _initialize_path_boosting(
+        self,
+        X,
+        list_anchor_nodes_labels: list,
+        main_label_name: str,
+        eval_set: list[tuple[list[nx.Graph], Iterable]] = None,
+    ):
         self.name_of_label_attribute = main_label_name
 
         # greate extended boosting matrix for train dataset
@@ -512,7 +616,8 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
             dataset=X,
             list_anchor_nodes_labels=list_anchor_nodes_labels,
             id_label_name=main_label_name,
-            replace_nan_with=self.replace_nan_with)
+            replace_nan_with=self.replace_nan_with,
+        )
         self.eval_set_ebm_df_and_target_ = []
 
         # generate extended boosting matrix for eval dataset
@@ -530,54 +635,73 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
                         dataset=eval_dataset,
                         list_anchor_nodes_labels=list_anchor_nodes_labels,
                         id_label_name=main_label_name,
-                        replace_nan_with=self.replace_nan_with)
-                    self.eval_set_ebm_df_and_target_.append([eval_set_ebm_dataframe, y_eval_set])
+                        replace_nan_with=self.replace_nan_with,
+                    )
+                    self.eval_set_ebm_df_and_target_.append(
+                        [eval_set_ebm_dataframe, y_eval_set]
+                    )
 
         # initialize base learner wrapper
-        self.base_learner_: AdditiveModelWrapperClassifier = AdditiveModelWrapperClassifier(
-            BaseModelClass=self.BaseLearnerClass,
-            base_model_class_kwargs=self.kwargs_for_base_learner,
-            learning_rate=self.learning_rate, use_tree_boost=self.use_tree_boost)
+        self.base_learner_: AdditiveModelWrapperClassifier = (
+            AdditiveModelWrapperClassifier(
+                BaseModelClass=self.BaseLearnerClass,
+                base_model_class_kwargs=self.kwargs_for_base_learner,
+                learning_rate=self.learning_rate,
+                use_tree_boost=self.use_tree_boost,
+            )
+        )
 
     @staticmethod
-    def _find_best_path(train_ebm_dataframe: pd.DataFrame, y, SelectorClass, kwargs_for_selector) -> tuple[int]:
+    def _find_best_path(
+        train_ebm_dataframe: pd.DataFrame, y, SelectorClass, kwargs_for_selector
+    ) -> tuple[int]:
         """
-         Selects the path with the highest importance from a frequency-focused dataframe by training a feature selector,
-         identifying the most significant column, and extracting the corresponding path.
+        Selects the path with the highest importance from a frequency-focused dataframe by training a feature selector,
+        identifying the most significant column, and extracting the corresponding path.
 
-         Note:important that this stays as static method because it is used also by the variable importance class, to select variable importance by comparison
+        Note:important that this stays as static method because it is used also by the variable importance class, to select variable importance by comparison
 
-         Parameters:
-             train_ebm_dataframe (pd.DataFrame): Extended boosting matrix containing path frequency details.
-             y (array-like): The target values or negative gradient for path selection.
-             SelectorClass: A feature selector (e.g., a regressor) used to determine column importance.
-             kwargs_for_selector (dict): Configuration parameters for SelectorClass.
+        Parameters:
+            train_ebm_dataframe (pd.DataFrame): Extended boosting matrix containing path frequency details.
+            y (array-like): The target values or negative gradient for path selection.
+            SelectorClass: A feature selector (e.g., a regressor) used to determine column importance.
+            kwargs_for_selector (dict): Configuration parameters for SelectorClass.
 
-         Returns:
-             tuple[int]: The path corresponding to the most important column.
-         """
+        Returns:
+            tuple[int]: The path corresponding to the most important column.
+        """
 
         base_feature_selector = SelectorClass(**kwargs_for_selector)
-        frequency_boosting_matrix = ExtendedBoostingMatrix.get_frequency_boosting_matrix(train_ebm_dataframe)
+        frequency_boosting_matrix = (
+            ExtendedBoostingMatrix.get_frequency_boosting_matrix(train_ebm_dataframe)
+        )
 
-        base_feature_selector = base_feature_selector.fit(X=frequency_boosting_matrix, y=y)
-        best_feature_index = np.array(base_feature_selector.feature_importances_).argmax()
+        base_feature_selector = base_feature_selector.fit(
+            X=frequency_boosting_matrix, y=y
+        )
+        best_feature_index = np.array(
+            base_feature_selector.feature_importances_
+        ).argmax()
         best_feature = frequency_boosting_matrix.columns[best_feature_index]
         best_path = ExtendedBoostingMatrix.get_path_from_column_name(best_feature)
 
         return best_path
 
     def _validate_data(
-            self,
-            X: list[nx.Graph] = "no_validation",
-            y="no_validation",
-            **check_params,
+        self,
+        X: list[nx.Graph] = "no_validation",
+        y="no_validation",
+        **check_params,
     ):
-
         util_validate_data(model=self, X=X, y=y, **check_params)
 
-    def plot_training_and_eval_errors(self, skip_first_n_iterations=False, show=True, save=False,
-                                      save_path: str | None = None):
+    def plot_training_and_eval_errors(
+        self,
+        skip_first_n_iterations=False,
+        show=True,
+        save=False,
+        save_path: str | None = None,
+    ):
         """
         Plots the training and evaluation set errors (Mean Squared Error) over iterations.
 
@@ -604,19 +728,30 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
             working directory is used.
 
         """
-        if hasattr(self, 'fitted_'):
+        if hasattr(self, "fitted_"):
             if not self.fitted_:
-                raise ValueError("The model has not been fitted yet. Please call fit() before plotting.")
+                raise ValueError(
+                    "The model has not been fitted yet. Please call fit() before"
+                    " plotting."
+                )
 
-        if hasattr(self, 'eval_sets_logloss_'):
+        if hasattr(self, "eval_sets_logloss_"):
             eval_sets_logloss = self.eval_sets_logloss_
         else:
             eval_sets_logloss = None
-        plot_training_and_eval_errors(learning_rate=self.learning_rate, train_mse=self.train_logloss_,
-                                      mse_eval_set=eval_sets_logloss, skip_first_n_iterations=skip_first_n_iterations,
-                                      show=show, save=save, save_path=save_path)
+        plot_training_and_eval_errors(
+            learning_rate=self.learning_rate,
+            train_mse=self.train_logloss_,
+            mse_eval_set=eval_sets_logloss,
+            skip_first_n_iterations=skip_first_n_iterations,
+            show=show,
+            save=save,
+            save_path=save_path,
+        )
 
-    def plot_variable_importance(self, top_n_features: int | None = None, show: bool = True):
+    def plot_variable_importance(
+        self, top_n_features: int | None = None, show: bool = True
+    ):
         """
         Plots the computed variable importance scores.
 
@@ -629,34 +764,51 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
         show : bool, default=True
             If True, the plot is displayed.
         """
-        if hasattr(self, 'fitted_'):
+        if hasattr(self, "fitted_"):
             if not self.fitted_:
-                raise ValueError("The model has not been fitted yet. Please call fit() before plotting.")
+                raise ValueError(
+                    "The model has not been fitted yet. Please call fit() before"
+                    " plotting."
+                )
 
         if self.parameters_variable_importance is None:
             raise ValueError(
-                "Variable importance is not computed. Please set parameters_variable_importance in the constructor.")
-        plot_variable_importance_utils(variable_importance=self.variable_importance_,
-                                       parameters_variable_importance=self.parameters_variable_importance,
-                                       top_n=top_n_features, show=show)
+                "Variable importance is not computed. Please set"
+                " parameters_variable_importance in the constructor."
+            )
+        plot_variable_importance_utils(
+            variable_importance=self.variable_importance_,
+            parameters_variable_importance=self.parameters_variable_importance,
+            top_n=top_n_features,
+            show=show,
+        )
 
     def get_mse_for_patience(self, patience: int, eval_set_index: int = 0) -> float:
         """
         Returns the Mean Squared Error (MSE) that we would obtain if we stopped training at the specified patience.
         By default the mse returned is the MSE relative to the first eval_set,
         """
-        if not hasattr(self, 'fitted_'):
-            raise ValueError("The model has not been fitted yet. Please call fit() before getting MSE for patience.")
+        if not hasattr(self, "fitted_"):
+            raise ValueError(
+                "The model has not been fitted yet. Please call fit() before getting"
+                " MSE for patience."
+            )
 
         if not hasattr(self, "eval_sets_logloss_"):
             raise ValueError(
-                "The model has not been evaluated on any evaluation set. Please provide an eval_set during fitting.")
+                "The model has not been evaluated on any evaluation set. Please provide"
+                " an eval_set during fitting."
+            )
 
         if len(self.eval_sets_logloss_) <= eval_set_index:
             raise ValueError(
-                f"Eval set index {eval_set_index} is out of bounds for the number of evaluation sets: {len(self.eval_sets_logloss_)}.")
+                f"Eval set index {eval_set_index} is out of bounds for the number of"
+                f" evaluation sets: {len(self.eval_sets_logloss_)}."
+            )
         if len(self.eval_sets_logloss_[eval_set_index]) < patience:
-            raise ValueError(f"Patience {patience} exceeds the number of training iterations.")
+            raise ValueError(
+                f"Patience {patience} exceeds the number of training iterations."
+            )
 
         consecutive_increases = 0
         last_logloss_value = self.eval_sets_logloss_[eval_set_index][0]
@@ -676,10 +828,13 @@ class SequentialPathBoostClassifier(BaseEstimator, RegressorMixin):
         """
         Returns the evaluation set MSE if it was computed during fitting.
         """
-        if hasattr(self, 'eval_sets_logloss_'):
+        if hasattr(self, "eval_sets_logloss_"):
             final_eval_set_logloss = []
             for logloss in self.eval_sets_logloss_:
                 final_eval_set_logloss.append(logloss[-1])
             return final_eval_set_logloss
         else:
-            raise AttributeError("Evaluation set MSE is not available. Please fit the model with eval_set.")
+            raise AttributeError(
+                "Evaluation set MSE is not available. Please fit the model with"
+                " eval_set."
+            )
