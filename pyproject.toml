@@ -39,8 +39,8 @@ progress = ["tqdm>=4.64"]
 all = ["tqdm>=4.64"]
 
 [project.urls]
-Homepage = "https://github.com/scikit-learn-contrib/path_boost"
-Issues = "https://github.com/scikit-learn-contrib/path_boost/issues"
+Homepage = "https://github.com/Claudio-Me/extended_path_boost"
+Issues = "https://github.com/Claudio-Me/extended_path_boost/issues"
 
 [tool.setuptools.packages.find]
 include = ["path_boost*"]
