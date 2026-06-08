@@ -15,7 +15,7 @@ Path Boost is a Python library for interpretable machine learning on graph-struc
 Install from PyPI:
 
 ```bash
-pip install path_boost
+pip install path_booste--resume
 ```
 
 ## Usage Example

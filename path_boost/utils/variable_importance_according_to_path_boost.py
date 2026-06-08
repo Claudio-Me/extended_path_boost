@@ -83,10 +83,14 @@ class VariableImportance_ForSequentialPathBoost:
         self, path_boost: "SequentialPathBoost"
     ) -> dict:
         # compute importance by error improvement
-        # if we are in the first iteration there is no previous error to compare with, then we set it equal to the second eror improvement
-        # note: one can think to compare the first iteration with the error that we would have if we would have used
-        # the mean of the labels (that is the variance of the labels in the case of MSE) however this does not work since
-        # the bae learner is limited by the learining rate, sometimes making it first training even worse than the mean
+        # For the first path there is no previous iteration to compare with. The
+        # booster starts from the constant model (the mean of y), so we use the error
+        # of predicting that mean as the baseline (for MSE this is the variance of the
+        # labels). The first path's importance is the error reduction it achieves on
+        # top of that constant model, clamped at 0: because the learning rate (or a
+        # learning-rate schedule / MAE) can occasionally make the first fit worse
+        # than the mean, an unclamped negative value would corrupt the normalized
+        # importances.
 
         # check that the iteration number is correct
         # if the iteration number does not coincide with the number of base learners (same as the number of errors)
@@ -96,8 +100,19 @@ class VariableImportance_ForSequentialPathBoost:
         previous_improvement = 0
         for iteration in range(path_boost.n_iter):
             if iteration == 0:
-                # in the first iteration we do not have a previous error to compare with so we skip
-                pass
+                # compare the first path against the constant (mean) model the
+                # booster starts from
+                first_selected_path = self.selected_path_at_iteration[0]
+                y_first = np.asarray(self.gradient_at_iteration[0], dtype=float)
+                baseline_mean = y_first.mean()
+                if self.error_used == "mse":
+                    baseline_error = float(np.mean((y_first - baseline_mean) ** 2))
+                    improvement = baseline_error - path_boost.train_mse_[0]
+                elif self.error_used == "mae":
+                    baseline_error = float(np.mean(np.abs(y_first - baseline_mean)))
+                    improvement = baseline_error - path_boost.train_mae_[0]
+                error_improvement[first_selected_path] += max(0.0, improvement)
+                previous_improvement = improvement
             else:
                 path = self.selected_path_at_iteration[iteration]
                 if self.error_used == "mse":
@@ -129,19 +144,6 @@ class VariableImportance_ForSequentialPathBoost:
                         )
                     error_improvement[path] += improvement
                 previous_improvement = improvement
-
-                if iteration == 1:
-                    # since we did not set any importance for the path selected in the zeroth iteration,
-                    # we now set it equal to the importance assignet to the second-selected path
-                    first_selected_path = self.selected_path_at_iteration[0]
-                    if self.error_used == "mse":
-                        error_improvement[first_selected_path] = (
-                            path_boost.train_mse_[0] - path_boost.train_mse_[1]
-                        )
-                    elif self.error_used == "mae":
-                        error_improvement[first_selected_path] = (
-                            path_boost.train_mae_[0] - path_boost.train_mae_[1]
-                        )
 
         dict_error_improvement = self._get_correlation_and_normalize_if_needed(
             path_boost=path_boost, error_improvement=error_improvement
@@ -182,7 +184,64 @@ class VariableImportance_ForSequentialPathBoost:
 
             # get the second-best path
             if iteration == 0:
-                # in the first iteration we do not have a previous error to compare with so we skip
+                # The first iteration starts from the constant model (mean of y). We
+                # still measure the first path against its best alternative, but the
+                # second-best base learner must be fit with the same first-step
+                # centering (fit on y - mean(y), predict mean(y) + lr * tree) so the
+                # error is comparable to train_mse_[0] / train_mae_[0]. The result is
+                # clamped at 0 for consistency with the absolute criterion.
+                if frequency_matrix_without_best_path.shape[1] == 0:
+                    # no alternative path to compare against: fall back to the
+                    # constant-model baseline
+                    y_first = np.asarray(gradient, dtype=float)
+                    baseline_mean = y_first.mean()
+                    if self.error_used == "mse":
+                        alt_error = float(np.mean((y_first - baseline_mean) ** 2))
+                        error_difference = alt_error - path_boost.train_mse_[0]
+                    elif self.error_used == "mae":
+                        alt_error = float(np.mean(np.abs(y_first - baseline_mean)))
+                        error_difference = alt_error - path_boost.train_mae_[0]
+                    error_improvement[selected_path_at_iteration] += max(
+                        0.0, error_difference
+                    )
+                    continue
+
+                second_best_path = path_boost._find_best_path(
+                    train_ebm_dataframe=frequency_matrix_without_best_path,
+                    y=gradient,
+                    SelectorClass=path_boost.SelectorClass,
+                    kwargs_for_selector=path_boost.kwargs_for_selector,
+                )
+
+                columns_to_keep = ExtendedBoostingMatrix.get_columns_related_to_path(
+                    second_best_path, train_ebm_dataframe_at_iteration.columns
+                )
+                restricted_df = train_ebm_dataframe_at_iteration[columns_to_keep]
+
+                new_base_learner = path_boost.BaseLearnerClass(
+                    **path_boost.kwargs_for_base_learner
+                )
+
+                target_mean = np.asarray(gradient, dtype=float).mean()
+                centered_gradient = np.asarray(gradient, dtype=float) - target_mean
+                new_base_learner.fit(restricted_df, centered_gradient)
+                new_base_learner_prediction = target_mean + (
+                    path_boost.learning_rate
+                    * pd.Series(new_base_learner.predict(restricted_df))
+                )
+                if self.error_used == "mse":
+                    new_base_learner_error = mean_squared_error(
+                        y_true=gradient, y_pred=new_base_learner_prediction
+                    )
+                    error_difference = new_base_learner_error - path_boost.train_mse_[0]
+                elif self.error_used == "mae":
+                    new_base_learner_error = mean_absolute_error(
+                        y_true=gradient, y_pred=new_base_learner_prediction
+                    )
+                    error_difference = new_base_learner_error - path_boost.train_mae_[0]
+                error_improvement[selected_path_at_iteration] += max(
+                    0.0, error_difference
+                )
                 continue
 
             second_best_path = path_boost._find_best_path(
